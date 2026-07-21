@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useSocket } from '../context/SocketContext';
 import confetti from 'canvas-confetti';
-import { Copy, Check, LogOut, RotateCcw, Send, MessageCircle, Trophy, Smile } from 'lucide-react';
+import { Copy, Check, LogOut, RotateCcw, Send, MessageCircle, ChevronDown, ChevronUp } from 'lucide-react';
 import RPSBoard from './boards/RPSBoard';
 import TicTacToeBoard from './boards/TicTacToeBoard';
 import ConnectFourBoard from './boards/ConnectFourBoard';
@@ -13,12 +13,12 @@ export default function GameRoom() {
   const { room, user, playerIndex, leaveRoom, sendChat, requestRematch } = useSocket();
   const [chatInput, setChatInput] = useState('');
   const [copiedCode, setCopiedCode] = useState(false);
+  const [isMobileChatOpen, setIsMobileChatOpen] = useState(false);
   const chatEndRef = useRef(null);
 
   const gameState = room?.gameState;
   const isFinished = gameState?.status === 'finished';
 
-  // Trigger win sound & confetti when match finishes
   useEffect(() => {
     if (isFinished) {
       if (gameState.isDraw) {
@@ -26,8 +26,8 @@ export default function GameRoom() {
       } else if (gameState.winner === playerIndex) {
         audio.playWin();
         confetti({
-          particleCount: 100,
-          spread: 70,
+          particleCount: 80,
+          spread: 60,
           origin: { y: 0.6 }
         });
       } else {
@@ -80,85 +80,97 @@ export default function GameRoom() {
   const player2 = room.players[1];
 
   return (
-    <div className="max-w-6xl mx-auto px-4 py-6 space-y-6">
-      {/* Top Bar: Room Info & Exit */}
-      <div className="card-geo bg-white p-4 flex flex-wrap items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <span className="badge-geo badge-purple text-base">
+    <div className="max-w-6xl mx-auto px-3 sm:px-4 py-4 sm:py-6 space-y-4 sm:space-y-6">
+      {/* Top Bar: Room Info & Actions */}
+      <div className="card-geo bg-white p-3 sm:p-4 flex flex-wrap items-center justify-between gap-2 sm:gap-4">
+        <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
+          <span className="badge-geo badge-purple text-xs sm:text-sm">
             🎮 {room.gameName}
           </span>
           
           <button
             onClick={copyRoomCode}
-            className="flex items-center gap-2 px-3 py-1 rounded-xl bg-gray-100 border-[2px] border-[#1E1E24] shadow-[2px_2px_0px_#1E1E24] font-mono text-sm font-bold hover:bg-[#FFD166] transition-all"
+            className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-gray-100 border-[2px] border-[#1E1E24] shadow-[1.5px_1.5px_0px_#1E1E24] font-mono text-xs sm:text-sm font-bold hover:bg-[#FFD166] transition-all"
           >
             <span>CODE: {room.id}</span>
-            {copiedCode ? <Check className="w-4 h-4 text-[#06D6A0]" /> : <Copy className="w-4 h-4" />}
+            {copiedCode ? <Check className="w-3.5 h-3.5 text-[#06D6A0]" /> : <Copy className="w-3.5 h-3.5" />}
           </button>
         </div>
 
-        <button
-          onClick={leaveRoom}
-          className="btn-geo btn-geo-coral text-sm py-2 px-4"
-        >
-          <LogOut className="w-4 h-4" /> Leave Room
-        </button>
+        <div className="flex items-center gap-2">
+          {/* Mobile Chat Toggle Button */}
+          <button
+            onClick={() => setIsMobileChatOpen(!isMobileChatOpen)}
+            className="lg:hidden btn-geo btn-geo-white text-xs py-1.5 px-3"
+          >
+            <MessageCircle className="w-3.5 h-3.5 text-[#6C5CE7]" />
+            <span>Chat ({room.chat?.length || 0})</span>
+            {isMobileChatOpen ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+          </button>
+
+          <button
+            onClick={leaveRoom}
+            className="btn-geo btn-geo-coral text-xs sm:text-sm py-1.5 sm:py-2 px-3 sm:px-4"
+          >
+            <LogOut className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> Leave
+          </button>
+        </div>
       </div>
 
-      {/* Main Gameplay Arena Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+      {/* Main Gameplay Arena */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6 items-start">
         {/* Left 2 Cols: Game Scorecards & Board */}
-        <div className="lg:col-span-2 space-y-6">
+        <div className="lg:col-span-2 space-y-4 sm:space-y-6">
           {/* Player Scorecards Header */}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-2 gap-2 sm:gap-4">
             {/* Player 1 Card */}
-            <div className={`card-geo p-4 flex items-center gap-3 transition-all ${
+            <div className={`card-geo p-2.5 sm:p-4 flex items-center gap-2 sm:gap-3 transition-all ${
               gameState?.turn === 0 && !isFinished
-                ? 'bg-[#FFD166] border-[4px] shadow-[6px_6px_0px_#1E1E24] scale-102'
+                ? 'bg-[#FFD166] border-[3px] sm:border-[4px] shadow-[4px_4px_0px_#1E1E24]'
                 : 'bg-white'
             }`}>
-              <div className="w-12 h-12 rounded-2xl bg-[#FF70A6] border-[2px] border-[#1E1E24] flex items-center justify-center text-2xl flex-shrink-0">
+              <div className="w-9 h-9 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-[#FF70A6] border-[2px] border-[#1E1E24] flex items-center justify-center text-lg sm:text-2xl flex-shrink-0">
                 {player1?.avatar || '👤'}
               </div>
               <div className="min-w-0">
-                <div className="font-['Fredoka'] font-bold text-[#1E1E24] truncate">
+                <div className="font-['Fredoka'] font-bold text-xs sm:text-base text-[#1E1E24] truncate">
                   {player1?.name || 'Waiting...'}
                 </div>
-                <div className="text-xs font-semibold text-[#5C5C66]">
-                  {player1 ? (player1.id === user.id ? '(You - P1)' : 'Player 1') : 'Waiting for P2'}
+                <div className="text-[10px] sm:text-xs font-semibold text-[#5C5C66] truncate">
+                  {player1 ? (player1.id === user.id ? '(You)' : 'P1') : 'Waiting'}
                 </div>
               </div>
             </div>
 
             {/* Player 2 Card */}
-            <div className={`card-geo p-4 flex items-center gap-3 transition-all ${
+            <div className={`card-geo p-2.5 sm:p-4 flex items-center gap-2 sm:gap-3 transition-all ${
               gameState?.turn === 1 && !isFinished
-                ? 'bg-[#FFD166] border-[4px] shadow-[6px_6px_0px_#1E1E24] scale-102'
+                ? 'bg-[#FFD166] border-[3px] sm:border-[4px] shadow-[4px_4px_0px_#1E1E24]'
                 : 'bg-white'
             }`}>
-              <div className="w-12 h-12 rounded-2xl bg-[#06D6A0] border-[2px] border-[#1E1E24] flex items-center justify-center text-2xl flex-shrink-0">
+              <div className="w-9 h-9 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-[#06D6A0] border-[2px] border-[#1E1E24] flex items-center justify-center text-lg sm:text-2xl flex-shrink-0">
                 {player2?.avatar || '⏳'}
               </div>
               <div className="min-w-0">
-                <div className="font-['Fredoka'] font-bold text-[#1E1E24] truncate">
+                <div className="font-['Fredoka'] font-bold text-xs sm:text-base text-[#1E1E24] truncate">
                   {player2?.name || 'Waiting...'}
                 </div>
-                <div className="text-xs font-semibold text-[#5C5C66]">
-                  {player2 ? (player2.id === user.id ? '(You - P2)' : 'Player 2') : 'Share Room Code!'}
+                <div className="text-[10px] sm:text-xs font-semibold text-[#5C5C66] truncate">
+                  {player2 ? (player2.id === user.id ? '(You)' : 'P2') : 'Share Code'}
                 </div>
               </div>
             </div>
           </div>
 
           {/* Active Game Board View */}
-          <div className="card-geo bg-white p-6 relative">
+          <div className="card-geo bg-white p-3 sm:p-6 relative overflow-hidden">
             {room.players.length < 2 ? (
-              <div className="text-center py-12 space-y-4">
-                <div className="w-16 h-16 mx-auto rounded-2xl bg-[#FFD166] border-[3px] border-[#1E1E24] shadow-[4px_4px_0px_#1E1E24] flex items-center justify-center text-3xl animate-bounce">
+              <div className="text-center py-8 sm:py-12 space-y-4">
+                <div className="w-14 h-14 sm:w-16 sm:h-16 mx-auto rounded-2xl bg-[#FFD166] border-[3px] border-[#1E1E24] shadow-[4px_4px_0px_#1E1E24] flex items-center justify-center text-2xl sm:text-3xl animate-bounce">
                   ⏳
                 </div>
-                <h3 className="text-2xl font-bold text-[#1E1E24]">Waiting for Player 2</h3>
-                <p className="text-sm font-semibold text-[#5C5C66] max-w-sm mx-auto">
+                <h3 className="text-xl sm:text-2xl font-bold text-[#1E1E24]">Waiting for Player 2</h3>
+                <p className="text-xs sm:text-sm font-semibold text-[#5C5C66] max-w-sm mx-auto">
                   Share code <span className="font-mono bg-[#FFD166] px-2 py-0.5 rounded border border-[#1E1E24]">{room.id}</span> with a friend to begin!
                 </p>
               </div>
@@ -167,59 +179,69 @@ export default function GameRoom() {
             )}
           </div>
 
-          {/* Match Finished Actions: Rematch & Victory Overlay */}
+          {/* Match Finished Overlay */}
           {isFinished && (
-            <div className="card-geo bg-[#FFD166] p-6 text-center space-y-4 animate-pop">
-              <div className="w-16 h-16 mx-auto rounded-3xl bg-white border-[3px] border-[#1E1E24] shadow-[4px_4px_0px_#1E1E24] flex items-center justify-center text-4xl">
+            <div className="card-geo bg-[#FFD166] p-4 sm:p-6 text-center space-y-3 sm:space-y-4 animate-pop">
+              <div className="w-12 h-12 sm:w-16 sm:h-16 mx-auto rounded-2xl sm:rounded-3xl bg-white border-[3px] border-[#1E1E24] shadow-[3px_3px_0px_#1E1E24] flex items-center justify-center text-3xl sm:text-4xl">
                 {gameState.isDraw ? '🤝' : (gameState.winner === playerIndex ? '🏆' : '💥')}
               </div>
               <div>
-                <h3 className="text-3xl font-extrabold text-[#1E1E24]">
+                <h3 className="text-2xl sm:text-3xl font-extrabold text-[#1E1E24]">
                   {gameState.isDraw
                     ? "It's a Draw!"
                     : (gameState.winner === playerIndex ? "Victory is Yours!" : "Better Luck Next Time!")}
                 </h3>
-                <p className="text-sm font-bold text-[#1E1E24]/80 mt-1">
-                  Match ended. Hit rematch to play again immediately!
+                <p className="text-xs sm:text-sm font-bold text-[#1E1E24]/80 mt-1">
+                  Match ended. Hit rematch to play again!
                 </p>
               </div>
 
-              <div className="flex justify-center gap-4">
+              <div className="flex justify-center gap-3">
                 <button
                   onClick={requestRematch}
-                  className="btn-geo btn-geo-primary text-base py-3 px-8"
+                  className="btn-geo btn-geo-primary text-sm sm:text-base py-2.5 px-6"
                 >
-                  <RotateCcw className="w-5 h-5" /> Request Rematch
+                  <RotateCcw className="w-4 h-4 sm:w-5 sm:h-5" /> Rematch
                 </button>
               </div>
             </div>
           )}
         </div>
 
-        {/* Right 1 Col: Live Chat & Emoji Reaction Bar */}
-        <div className="card-geo bg-white p-4 h-[560px] flex flex-col justify-between">
-          <div className="pb-3 border-b-[3px] border-[#1E1E24] flex items-center gap-2">
-            <MessageCircle className="w-5 h-5 text-[#6C5CE7]" />
-            <h3 className="font-['Fredoka'] text-lg font-bold text-[#1E1E24]">Room Chat</h3>
+        {/* Right 1 Col: Live Chat & Emoji Bar (Collapsible on Mobile) */}
+        <div className={`card-geo bg-white p-4 h-[480px] lg:h-[540px] flex flex-col justify-between ${
+          isMobileChatOpen ? 'block' : 'hidden lg:flex'
+        }`}>
+          <div className="pb-2.5 border-b-[3px] border-[#1E1E24] flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <MessageCircle className="w-5 h-5 text-[#6C5CE7]" />
+              <h3 className="font-['Fredoka'] text-base sm:text-lg font-bold text-[#1E1E24]">Room Chat</h3>
+            </div>
+            <button
+              onClick={() => setIsMobileChatOpen(false)}
+              className="lg:hidden text-xs font-bold text-gray-500 hover:text-black"
+            >
+              Close ✖
+            </button>
           </div>
 
           {/* Messages Scroll View */}
-          <div className="flex-1 overflow-y-auto py-3 space-y-3 px-1">
+          <div className="flex-1 overflow-y-auto py-3 space-y-2.5 px-1">
             {room.chat?.length === 0 ? (
-              <div className="text-center py-10 text-xs font-semibold text-gray-400">
+              <div className="text-center py-8 text-xs font-semibold text-gray-400">
                 No messages yet. Send a quick reaction!
               </div>
             ) : (
               room.chat?.map((msg) => (
                 <div key={msg.id} className="space-y-0.5">
-                  <div className="flex items-center gap-1.5 text-xs">
+                  <div className="flex items-center gap-1 text-[11px]">
                     <span>{msg.avatar}</span>
                     <span className="font-bold text-[#1E1E24]">{msg.sender}</span>
-                    <span className="text-[10px] text-gray-400">{msg.time}</span>
+                    <span className="text-[9px] text-gray-400">{msg.time}</span>
                   </div>
-                  <div className={`p-2 rounded-xl border-[2px] border-[#1E1E24] font-semibold text-sm max-w-[85%] ${
+                  <div className={`p-2 rounded-xl border-[2px] border-[#1E1E24] font-semibold text-xs sm:text-sm max-w-[85%] ${
                     msg.type === 'emoji'
-                      ? 'bg-[#FFD166] text-2xl w-fit'
+                      ? 'bg-[#FFD166] text-xl w-fit'
                       : 'bg-gray-50 text-[#1E1E24]'
                   }`}>
                     {msg.message}
@@ -231,13 +253,13 @@ export default function GameRoom() {
           </div>
 
           {/* Emoji Quick Reactions */}
-          <div className="pt-2 border-t-[2px] border-gray-200">
-            <div className="flex justify-between gap-1 mb-2">
+          <div className="pt-2 border-t-[2px] border-gray-200 space-y-2">
+            <div className="flex justify-between gap-1">
               {['😄', '🔥', '👏', '🏆', '😱', '💩'].map((em) => (
                 <button
                   key={em}
                   onClick={() => handleEmojiClick(em)}
-                  className="w-9 h-9 rounded-lg bg-gray-50 border-[2px] border-[#1E1E24] flex items-center justify-center text-lg hover:bg-[#FFD166] active:scale-95 transition-all"
+                  className="w-8 h-8 sm:w-9 sm:h-9 rounded-lg bg-gray-50 border-[2px] border-[#1E1E24] flex items-center justify-center text-base sm:text-lg hover:bg-[#FFD166] active:scale-95 transition-all"
                 >
                   {em}
                 </button>
@@ -250,14 +272,14 @@ export default function GameRoom() {
                 type="text"
                 value={chatInput}
                 onChange={(e) => setChatInput(e.target.value)}
-                placeholder="Type a message..."
-                className="input-geo py-2 text-sm"
+                placeholder="Type message..."
+                className="input-geo py-1.5 px-3 text-xs sm:text-sm"
               />
               <button
                 type="submit"
-                className="btn-geo btn-geo-purple px-3 py-2"
+                className="btn-geo btn-geo-primary px-3 py-1.5 text-xs"
               >
-                <Send className="w-4 h-4 text-white" />
+                <Send className="w-3.5 h-3.5 text-white" />
               </button>
             </form>
           </div>

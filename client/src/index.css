@@ -39,6 +39,8 @@
   box-sizing: border-box;
   margin: 0;
   padding: 0;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
 }
 
 body {
@@ -125,8 +127,14 @@ h1, h2, h3, h4, h5, h6 {
   border: var(--border-thick);
   box-shadow: var(--shadow-flat);
   border-radius: var(--radius-lg);
-  padding: 1.5rem;
+  padding: 1.25rem;
   transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+@media (min-width: 640px) {
+  .card-geo {
+    padding: 1.5rem;
+  }
 }
 
 .card-geo-hover:hover {
@@ -192,7 +200,7 @@ h1, h2, h3, h4, h5, h6 {
 
 /* Custom Scrollbar */
 ::-webkit-scrollbar {
-  width: 10px;
+  width: 6px;
 }
 ::-webkit-scrollbar-track {
   background: var(--bg-main);
