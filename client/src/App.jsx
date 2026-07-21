@@ -41,7 +41,7 @@ export default function App() {
       <footer className="py-6 border-t-[3px] border-[#1E1E24] bg-white text-center text-xs font-bold text-[#5C5C66] mt-12">
         <div className="max-w-6xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-3">
           <div className="font-['Fredoka'] text-sm text-[#1E1E24]">
-            🎮 Arcade<span className="text-[#FF5A5F]">Arena</span> — 2-Player Multiplayer Hub
+            🎮 Yash's <span className="text-[#FF5A5F]">Arcade Arena</span> — 2-Player Multiplayer Hub
           </div>
           <div>
             Built with React, Express, Socket.io & Web Audio API

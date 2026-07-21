@@ -18,7 +18,7 @@ export default function Navbar({ activeTab, setActiveTab, onOpenProfile }) {
           </div>
           <div className="hidden xs:block">
             <span className="font-['Fredoka'] text-xl sm:text-2xl font-bold tracking-wide text-[#1E1E24]">
-              Arcade<span className="text-[#FF5A5F]">Arena</span>
+              Yash's <span className="text-[#FF5A5F]">Arcade Arena</span>
             </span>
             <div className="flex items-center gap-1.5 text-[10px] sm:text-xs font-semibold text-[#5C5C66]">
               <span className={`w-2 h-2 rounded-full ${connected ? 'bg-[#06D6A0]' : 'bg-[#FF5A5F] animate-ping'}`} />
