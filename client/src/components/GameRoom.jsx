@@ -129,8 +129,12 @@ export default function GameRoom() {
                 ? 'bg-[#FFD166] border-[3px] sm:border-[4px] shadow-[4px_4px_0px_#1E1E24]'
                 : 'bg-white'
             }`}>
-              <div className="w-9 h-9 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-[#FF70A6] border-[2px] border-[#1E1E24] flex items-center justify-center text-lg sm:text-2xl flex-shrink-0">
-                {player1?.avatar || '👤'}
+              <div className="w-9 h-9 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-[#FF70A6] border-[2px] border-[#1E1E24] flex items-center justify-center text-lg sm:text-2xl flex-shrink-0 overflow-hidden">
+                {player1?.picture ? (
+                  <img src={player1.picture} alt={player1.name} className="w-full h-full object-cover" />
+                ) : (
+                  player1?.avatar || '👤'
+                )}
               </div>
               <div className="min-w-0">
                 <div className="font-['Fredoka'] font-bold text-xs sm:text-base text-[#1E1E24] truncate">
@@ -148,8 +152,12 @@ export default function GameRoom() {
                 ? 'bg-[#FFD166] border-[3px] sm:border-[4px] shadow-[4px_4px_0px_#1E1E24]'
                 : 'bg-white'
             }`}>
-              <div className="w-9 h-9 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-[#06D6A0] border-[2px] border-[#1E1E24] flex items-center justify-center text-lg sm:text-2xl flex-shrink-0">
-                {player2?.avatar || '⏳'}
+              <div className="w-9 h-9 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-[#06D6A0] border-[2px] border-[#1E1E24] flex items-center justify-center text-lg sm:text-2xl flex-shrink-0 overflow-hidden">
+                {player2?.picture ? (
+                  <img src={player2.picture} alt={player2.name} className="w-full h-full object-cover" />
+                ) : (
+                  player2?.avatar || '⏳'
+                )}
               </div>
               <div className="min-w-0">
                 <div className="font-['Fredoka'] font-bold text-xs sm:text-base text-[#1E1E24] truncate">
@@ -208,7 +216,7 @@ export default function GameRoom() {
           )}
         </div>
 
-        {/* Right 1 Col: Live Chat & Emoji Bar (Collapsible on Mobile) */}
+        {/* Right 1 Col: Live Chat & Emoji Bar */}
         <div className={`card-geo bg-white p-4 h-[480px] lg:h-[540px] flex flex-col justify-between ${
           isMobileChatOpen ? 'block' : 'hidden lg:flex'
         }`}>
@@ -234,8 +242,12 @@ export default function GameRoom() {
             ) : (
               room.chat?.map((msg) => (
                 <div key={msg.id} className="space-y-0.5">
-                  <div className="flex items-center gap-1 text-[11px]">
-                    <span>{msg.avatar}</span>
+                  <div className="flex items-center gap-1.5 text-[11px]">
+                    {msg.picture ? (
+                      <img src={msg.picture} alt="" className="w-4 h-4 rounded-full border border-[#1E1E24] object-cover" />
+                    ) : (
+                      <span>{msg.avatar}</span>
+                    )}
                     <span className="font-bold text-[#1E1E24]">{msg.sender}</span>
                     <span className="text-[9px] text-gray-400">{msg.time}</span>
                   </div>

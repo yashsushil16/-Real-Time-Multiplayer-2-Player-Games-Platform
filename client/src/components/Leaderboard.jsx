@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useSocket } from '../context/SocketContext';
-import { Trophy, Medal, Award, Flame } from 'lucide-react';
+import { Flame } from 'lucide-react';
 
 export default function Leaderboard() {
   const { SERVER_URL } = useSocket();
@@ -31,7 +31,7 @@ export default function Leaderboard() {
         </div>
         <h1 className="text-3xl font-extrabold text-[#1E1E24]">Global Leaderboards</h1>
         <p className="text-sm font-semibold text-[#1E1E24]/80">
-          Rankings updated in real-time based on match ELO ratings.
+          Rankings generated live from real matches stored in MongoDB Atlas.
         </p>
       </div>
 
@@ -39,11 +39,13 @@ export default function Leaderboard() {
       <div className="card-geo bg-white p-6">
         {loading ? (
           <div className="text-center py-12 font-bold text-gray-500">
-            Loading rankings...
+            Loading real rankings from MongoDB...
           </div>
         ) : leaderboard.length === 0 ? (
-          <div className="text-center py-12 font-bold text-gray-400">
-            No games played yet. Play a match to get on the board!
+          <div className="text-center py-12 font-bold text-gray-400 space-y-2">
+            <div className="text-4xl">🎮</div>
+            <div className="font-['Fredoka'] text-xl font-bold text-[#1E1E24]">No ranked players yet</div>
+            <p className="text-sm text-gray-500">Play a 2-player match to get your name on the live MongoDB leaderboard!</p>
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -86,12 +88,25 @@ export default function Leaderboard() {
 
                       <td className="py-4 px-4">
                         <div className="flex items-center gap-3">
-                          <span className="text-2xl p-1 bg-gray-100 rounded-lg border border-[#1E1E24]">
-                            {user.avatar}
-                          </span>
-                          <span className="font-['Fredoka'] text-base font-bold text-[#1E1E24]">
-                            {user.name}
-                          </span>
+                          {user.picture ? (
+                            <img
+                              src={user.picture}
+                              alt={user.name}
+                              className="w-9 h-9 rounded-full border-[2px] border-[#1E1E24] object-cover flex-shrink-0"
+                            />
+                          ) : (
+                            <span className="text-2xl p-1 bg-gray-100 rounded-lg border border-[#1E1E24]">
+                              {user.avatar || '🎮'}
+                            </span>
+                          )}
+                          <div className="flex flex-col">
+                            <span className="font-['Fredoka'] text-base font-bold text-[#1E1E24]">
+                              {user.name}
+                            </span>
+                            {user.isGoogle && (
+                              <span className="text-[10px] text-[#4EA8DE] font-bold">Google Account</span>
+                            )}
+                          </div>
                         </div>
                       </td>
 

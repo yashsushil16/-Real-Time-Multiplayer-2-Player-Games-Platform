@@ -11,7 +11,6 @@ dotenv.config();
 const app = express();
 const httpServer = createServer(app);
 
-// CORS configuration supporting local Vite dev server and production domains
 const CORS_ORIGIN = process.env.CORS_ORIGIN || '*';
 
 app.use(cors({ origin: CORS_ORIGIN, credentials: true }));
@@ -32,40 +31,71 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
-app.get('/api/leaderboard', (req, res) => {
+app.get('/api/leaderboard', async (req, res) => {
   try {
-    const users = db.getUsers();
+    const users = await db.getUsers();
     res.json({ success: true, leaderboard: users });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
 });
 
-app.get('/api/matches', (req, res) => {
+app.get('/api/matches', async (req, res) => {
   try {
-    const matches = db.getMatches();
+    const { userId } = req.query;
+    const matches = await db.getMatches(userId || null);
     res.json({ success: true, matches });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
 });
 
-app.post('/api/user/profile', (req, res) => {
+app.post('/api/auth/google', async (req, res) => {
   try {
-    const { userId, name, avatar } = req.body;
+    const { googleId, name, email, picture } = req.body;
+    if (!googleId) return res.status(400).json({ success: false, error: 'Google ID is required' });
+
+    const userId = 'usr_g_' + googleId;
+    const user = await db.upsertUser({
+      userId,
+      googleId,
+      name,
+      email,
+      picture,
+      isGoogle: true
+    });
+
+    res.json({ success: true, user });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.post('/api/user/profile', async (req, res) => {
+  try {
+    const { userId, name, avatar, picture, googleId, email, isGoogle } = req.body;
     if (!userId) return res.status(400).json({ success: false, error: 'User ID is required' });
 
-    const updatedUser = db.upsertUser(userId, name, avatar);
+    const updatedUser = await db.upsertUser({
+      userId,
+      name,
+      avatar,
+      picture,
+      googleId,
+      email,
+      isGoogle
+    });
+
     res.json({ success: true, user: updatedUser });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
 });
 
-app.get('/api/stats', (req, res) => {
+app.get('/api/stats', async (req, res) => {
   try {
-    const users = db.getUsers();
-    const matches = db.getMatches();
+    const users = await db.getUsers();
+    const matches = await db.getMatches();
     const activeRoomsCount = roomManager.rooms.size;
 
     res.json({
@@ -109,7 +139,6 @@ io.on('connection', (socket) => {
 
       socket.join(result.room.id);
       
-      // Broadcast state update to everyone in room
       io.to(result.room.id).emit('room_updated', result.room);
 
       if (callback) callback({ success: true, room: result.room, playerIndex: result.playerIndex });
@@ -143,7 +172,7 @@ io.on('connection', (socket) => {
     roomManager.removeFromQueue(socket.id);
   });
 
-  // Make Game Move (Server Authoritative)
+  // Make Game Move
   socket.on('make_move', ({ roomId, move }) => {
     const result = roomManager.handleMove({ roomId, socketId: socket.id, move });
     if (result.error) {

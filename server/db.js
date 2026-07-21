@@ -10,8 +10,12 @@ const DATA_FILE = path.join(__dirname, 'data_store.json');
 // Mongoose Schema Definitions for MongoDB Atlas
 const UserSchema = new mongoose.Schema({
   id: { type: String, required: true, unique: true },
+  googleId: { type: String, default: null },
+  email: { type: String, default: null },
   name: { type: String, required: true },
   avatar: { type: String, default: '🎮' },
+  picture: { type: String, default: null },
+  isGoogle: { type: Boolean, default: false },
   elo: { type: Number, default: 1000 },
   wins: { type: Number, default: 0 },
   losses: { type: Number, default: 0 },
@@ -22,8 +26,8 @@ const MatchSchema = new mongoose.Schema({
   id: { type: String, required: true, unique: true },
   gameType: String,
   gameName: String,
-  player1: { name: String, avatar: String },
-  player2: { name: String, avatar: String },
+  player1: { id: String, name: String, avatar: String, picture: String },
+  player2: { id: String, name: String, avatar: String, picture: String },
   winner: String,
   isDraw: Boolean,
   score: String
@@ -62,12 +66,9 @@ class StorageAdapter {
     } catch (err) {
       console.error('Error loading data_store.json:', err.message);
     }
+    // Clean initial state without fake dummy records
     const initData = {
-      users: [
-        { id: 'usr_guest_1', name: 'RetroGamer', avatar: '🎮', elo: 1250, wins: 12, losses: 4, draws: 1 },
-        { id: 'usr_guest_2', name: 'PixelMaster', avatar: '👾', elo: 1180, wins: 9, losses: 6, draws: 2 },
-        { id: 'usr_guest_3', name: 'NeonKnight', avatar: '⚔️', elo: 1120, wins: 7, losses: 5, draws: 0 }
-      ],
+      users: [],
       matches: []
     };
     this.saveLocalData(initData);
@@ -82,21 +83,50 @@ class StorageAdapter {
     }
   }
 
-  getUsers() {
+  async getUsers() {
+    if (this.isMongoConnected) {
+      try {
+        const users = await User.find().sort({ elo: -1 }).lean();
+        return users;
+      } catch (e) {
+        console.error('Mongo getUsers error:', e);
+      }
+    }
     return this.localData.users.sort((a, b) => b.elo - a.elo);
   }
 
-  getMatches() {
-    return this.localData.matches.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+  async getMatches(userId = null) {
+    if (this.isMongoConnected) {
+      try {
+        const query = userId
+          ? { $or: [{ 'player1.id': userId }, { 'player2.id': userId }] }
+          : {};
+        const matches = await Match.find(query).sort({ createdAt: -1 }).limit(50).lean();
+        return matches;
+      } catch (e) {
+        console.error('Mongo getMatches error:', e);
+      }
+    }
+
+    let matches = this.localData.matches;
+    if (userId) {
+      matches = matches.filter(m => m.player1?.id === userId || m.player2?.id === userId);
+    }
+    return matches.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
   }
 
-  upsertUser(userId, name, avatar) {
-    let user = this.localData.users.find(u => u.id === userId);
+  async upsertUser({ userId, name, avatar, picture, googleId, email, isGoogle }) {
+    let user = this.localData.users.find(u => u.id === userId || (googleId && u.googleId === googleId));
+
     if (!user) {
       user = {
-        id: userId,
+        id: userId || 'usr_' + Math.random().toString(36).substring(2, 9),
+        googleId: googleId || null,
+        email: email || null,
         name: name || `Guest_${Math.floor(1000 + Math.random() * 9000)}`,
         avatar: avatar || '🎲',
+        picture: picture || null,
+        isGoogle: !!isGoogle,
         elo: 1000,
         wins: 0,
         losses: 0,
@@ -106,23 +136,32 @@ class StorageAdapter {
     } else {
       if (name) user.name = name;
       if (avatar) user.avatar = avatar;
+      if (picture) user.picture = picture;
+      if (googleId) user.googleId = googleId;
+      if (email) user.email = email;
+      if (isGoogle !== undefined) user.isGoogle = isGoogle;
     }
+
     this.saveLocalData();
 
     if (this.isMongoConnected) {
-      User.findOneAndUpdate({ id: userId }, user, { upsert: true, new: true }).catch(err => console.error('Mongo sync error:', err));
+      try {
+        await User.findOneAndUpdate({ id: user.id }, user, { upsert: true, new: true });
+      } catch (err) {
+        console.error('Mongo upsertUser error:', err);
+      }
     }
 
     return user;
   }
 
-  recordMatch({ gameType, gameName, player1, player2, winner, isDraw, score }) {
+  async recordMatch({ gameType, gameName, player1, player2, winner, isDraw, score }) {
     const match = {
       id: 'match_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
       gameType,
       gameName,
-      player1: { name: player1.name, avatar: player1.avatar || '🎮' },
-      player2: { name: player2.name, avatar: player2.avatar || '🕹️' },
+      player1: { id: player1.id, name: player1.name, avatar: player1.avatar || '🎮', picture: player1.picture || null },
+      player2: { id: player2.id, name: player2.name, avatar: player2.avatar || '🕹️', picture: player2.picture || null },
       winner: isDraw ? 'Draw' : winner,
       isDraw: !!isDraw,
       score: score || (isDraw ? 'Draw' : 'Victory'),
@@ -134,8 +173,8 @@ class StorageAdapter {
       this.localData.matches = this.localData.matches.slice(0, 50);
     }
 
-    const p1 = this.upsertUser(player1.id, player1.name, player1.avatar);
-    const p2 = this.upsertUser(player2.id, player2.name, player2.avatar);
+    const p1 = await this.upsertUser(player1);
+    const p2 = await this.upsertUser(player2);
 
     if (isDraw) {
       p1.draws += 1;
@@ -155,7 +194,13 @@ class StorageAdapter {
     this.saveLocalData();
 
     if (this.isMongoConnected) {
-      Match.create(match).catch(err => console.error('Mongo record match error:', err));
+      try {
+        await Match.create(match);
+        await User.findOneAndUpdate({ id: p1.id }, p1);
+        await User.findOneAndUpdate({ id: p2.id }, p2);
+      } catch (err) {
+        console.error('Mongo record match error:', err);
+      }
     }
 
     return match;

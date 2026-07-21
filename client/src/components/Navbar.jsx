@@ -1,6 +1,6 @@
 import React from 'react';
 import { useSocket } from '../context/SocketContext';
-import { Volume2, VolumeX, Trophy, History, Gamepad2, User } from 'lucide-react';
+import { Volume2, VolumeX, Trophy, History, Gamepad2, User, LogIn } from 'lucide-react';
 
 export default function Navbar({ activeTab, setActiveTab, onOpenProfile }) {
   const { user, connected, isMuted, toggleSound } = useSocket();
@@ -66,7 +66,7 @@ export default function Navbar({ activeTab, setActiveTab, onOpenProfile }) {
           </button>
         </nav>
 
-        {/* Right Actions: Sound + User Profile */}
+        {/* Right Actions: Sound + User Profile Badge */}
         <div className="flex items-center gap-1.5 sm:gap-3">
           <button
             onClick={toggleSound}
@@ -78,11 +78,25 @@ export default function Navbar({ activeTab, setActiveTab, onOpenProfile }) {
 
           <button
             onClick={onOpenProfile}
-            className="flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1 sm:py-1.5 rounded-xl bg-[#FF70A6] border-[2px] sm:border-[3px] border-[#1E1E24] shadow-[2px_2px_0px_#1E1E24] text-white font-['Fredoka'] font-semibold hover:scale-105 active:translate-x-[1px] active:translate-y-[1px] transition-all"
+            className={`flex items-center gap-1.5 px-2 sm:px-3 py-1 sm:py-1.5 rounded-xl border-[2px] sm:border-[3px] border-[#1E1E24] shadow-[2px_2px_0px_#1E1E24] font-['Fredoka'] font-semibold hover:scale-105 active:translate-x-[1px] active:translate-y-[1px] transition-all ${
+              user.isGoogle ? 'bg-[#4EA8DE] text-white' : 'bg-[#FF70A6] text-white'
+            }`}
           >
-            <span className="text-base sm:text-xl">{user.avatar}</span>
+            {user.picture ? (
+              <img
+                src={user.picture}
+                alt={user.name}
+                className="w-6 h-6 sm:w-7 sm:h-7 rounded-full border-[1.5px] border-[#1E1E24] object-cover flex-shrink-0"
+              />
+            ) : (
+              <span className="text-base sm:text-xl">{user.avatar}</span>
+            )}
             <span className="hidden md:inline max-w-[90px] truncate text-xs sm:text-sm">{user.name}</span>
-            <User className="w-3.5 h-3.5 sm:w-4 sm:h-4 opacity-80" />
+            {user.isGoogle ? (
+              <span className="text-[10px] bg-white/30 px-1 rounded font-mono font-bold">G</span>
+            ) : (
+              <User className="w-3.5 h-3.5 sm:w-4 sm:h-4 opacity-80" />
+            )}
           </button>
         </div>
       </div>

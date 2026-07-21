@@ -15,7 +15,9 @@ function getInitialUser() {
   const defaultUser = {
     id: 'usr_' + Math.random().toString(36).substring(2, 9),
     name: 'Player_' + Math.floor(1000 + Math.random() * 9000),
-    avatar: AVATARS[Math.floor(Math.random() * AVATARS.length)]
+    avatar: AVATARS[Math.floor(Math.random() * AVATARS.length)],
+    picture: null,
+    isGoogle: false
   };
   localStorage.setItem('arcade_user', JSON.stringify(defaultUser));
   return defaultUser;
@@ -32,7 +34,6 @@ export function SocketProvider({ children }) {
   const [errorMsg, setErrorMsg] = useState(null);
   const [isMuted, setIsMuted] = useState(false);
 
-  // Server URL logic (defaults to local 4000 port or VITE_SERVER_URL)
   const SERVER_URL = import.meta.env.VITE_SERVER_URL || 'http://localhost:4000';
 
   useEffect(() => {
@@ -61,7 +62,6 @@ export function SocketProvider({ children }) {
       setSearchingGameType(null);
       setRoom(matchedRoom);
       
-      // Determine player index
       const idx = matchedRoom.players.findIndex(p => p.id === user.id);
       setPlayerIndex(idx !== -1 ? idx : 0);
       audio.playWin();
@@ -85,8 +85,8 @@ export function SocketProvider({ children }) {
     };
   }, []);
 
-  const updateUserProfile = async (name, avatar) => {
-    const updated = { ...user, name, avatar };
+  const updateUserProfile = async (name, avatar, picture = null) => {
+    const updated = { ...user, name, avatar, picture: picture ?? user.picture };
     setUser(updated);
     localStorage.setItem('arcade_user', JSON.stringify(updated));
 
@@ -94,11 +94,69 @@ export function SocketProvider({ children }) {
       await fetch(`${SERVER_URL}/api/user/profile`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: user.id, name, avatar })
+        body: JSON.stringify({
+          userId: user.id,
+          name,
+          avatar,
+          picture: updated.picture,
+          googleId: user.googleId,
+          email: user.email,
+          isGoogle: user.isGoogle
+        })
       });
     } catch (err) {
       console.error('Failed to sync profile to server:', err);
     }
+  };
+
+  const loginWithGoogle = async (googleUser) => {
+    // googleUser = { googleId, name, email, picture }
+    try {
+      const res = await fetch(`${SERVER_URL}/api/auth/google`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(googleUser)
+      });
+      const data = await res.json();
+      if (data.success) {
+        const fullUser = {
+          ...data.user,
+          avatar: data.user.avatar || '👑',
+          picture: googleUser.picture,
+          isGoogle: true
+        };
+        setUser(fullUser);
+        localStorage.setItem('arcade_user', JSON.stringify(fullUser));
+        audio.playWin();
+      }
+    } catch (err) {
+      console.error('Google login server error:', err);
+      // Fallback local set
+      const localUser = {
+        id: 'usr_g_' + googleUser.googleId,
+        googleId: googleUser.googleId,
+        name: googleUser.name,
+        email: googleUser.email,
+        picture: googleUser.picture,
+        avatar: '👑',
+        isGoogle: true
+      };
+      setUser(localUser);
+      localStorage.setItem('arcade_user', JSON.stringify(localUser));
+    }
+  };
+
+  const logoutUser = () => {
+    const defaultUser = {
+      id: 'usr_' + Math.random().toString(36).substring(2, 9),
+      name: 'Player_' + Math.floor(1000 + Math.random() * 9000),
+      avatar: AVATARS[Math.floor(Math.random() * AVATARS.length)],
+      picture: null,
+      isGoogle: false
+    };
+    setUser(defaultUser);
+    localStorage.setItem('arcade_user', JSON.stringify(defaultUser));
+    audio.playClick();
   };
 
   const createRoom = (gameType, callback) => {
@@ -199,6 +257,8 @@ export function SocketProvider({ children }) {
         avatars: AVATARS,
         SERVER_URL,
         updateUserProfile,
+        loginWithGoogle,
+        logoutUser,
         createRoom,
         joinRoom,
         startQuickMatch,
