@@ -7,16 +7,18 @@ export default function UserProfileModal({ isOpen, onClose }) {
   const [name, setName] = useState(user.name);
   const [selectedAvatar, setSelectedAvatar] = useState(user.avatar);
 
+  const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || '';
+
   useEffect(() => {
     setName(user.name);
     setSelectedAvatar(user.avatar);
   }, [user]);
 
   useEffect(() => {
-    if (isOpen && window.google?.accounts?.id) {
+    if (isOpen && GOOGLE_CLIENT_ID && window.google?.accounts?.id) {
       try {
         window.google.accounts.id.initialize({
-          client_id: '928475928374-example.apps.googleusercontent.com', // Google GIS initialization
+          client_id: GOOGLE_CLIENT_ID,
           callback: handleGoogleCallback
         });
 
@@ -32,7 +34,7 @@ export default function UserProfileModal({ isOpen, onClose }) {
         console.error('Google accounts SDK init error:', e);
       }
     }
-  }, [isOpen]);
+  }, [isOpen, GOOGLE_CLIENT_ID]);
 
   // Decode JWT payload without heavy external libs
   const parseJwt = (token) => {
@@ -88,7 +90,7 @@ export default function UserProfileModal({ isOpen, onClose }) {
             <span>🎨</span> Gamer Profile
           </h2>
           <p className="text-xs font-semibold text-[#5C5C66]">
-            Log in with Google to sync your avatar & rank across devices!
+            Log in with Google to sync your profile picture & stats across devices!
           </p>
         </div>
 
@@ -126,30 +128,30 @@ export default function UserProfileModal({ isOpen, onClose }) {
           </div>
         ) : (
           <div className="space-y-3">
-            <div id="googleSignInBtn" className="w-full flex justify-center" />
-            
-            {/* Custom Google Trigger Button */}
-            <button
-              onClick={() => {
-                // Simulate quick Google sign-in demo trigger if popup is blocked
-                const mockGoogleId = 'g_' + Math.floor(100000 + Math.random() * 900000);
-                loginWithGoogle({
-                  googleId: mockGoogleId,
-                  name: name || 'Google Gamer',
-                  email: 'gamer@gmail.com',
-                  picture: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=120&q=80'
-                });
-                onClose();
-              }}
-              className="btn-geo btn-geo-white w-full py-2.5 text-sm"
-            >
-              <img
-                src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg"
-                alt="Google"
-                className="w-4 h-4"
-              />
-              Sign in with Google
-            </button>
+            {GOOGLE_CLIENT_ID ? (
+              <div id="googleSignInBtn" className="w-full flex justify-center" />
+            ) : (
+              <button
+                onClick={() => {
+                  // Instant Demo Google Account Login
+                  loginWithGoogle({
+                    googleId: 'g_demo_' + Math.floor(100000 + Math.random() * 900000),
+                    name: 'Yash Sushil',
+                    email: 'yash.sushil16@gmail.com',
+                    picture: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=120&q=80'
+                  });
+                  onClose();
+                }}
+                className="btn-geo btn-geo-white w-full py-2.5 text-sm"
+              >
+                <img
+                  src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg"
+                  alt="Google"
+                  className="w-4 h-4"
+                />
+                Sign in with Google Account
+              </button>
+            )}
           </div>
         )}
 
@@ -196,7 +198,7 @@ export default function UserProfileModal({ isOpen, onClose }) {
               <button
                 type="button"
                 onClick={onClose}
-                className="btn-geo btn-geo-white"
+                className="btn-geo btn-geo-[#FF70A6]"
               >
                 Cancel
               </button>
