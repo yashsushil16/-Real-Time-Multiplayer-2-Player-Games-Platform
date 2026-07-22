@@ -39,6 +39,7 @@ export default function GameRoom() {
   const localStreamRef = useRef(null);
   const pcRef = useRef(null);
   const remoteAudioRef = useRef(null);
+  const iceCandidatesQueueRef = useRef([]);
 
   const myPlayer = room?.players?.find(p => p.id === user.id);
   const isMyVoiceEnabled = myPlayer?.voiceEnabled || false;
@@ -70,9 +71,19 @@ export default function GameRoom() {
     };
 
     pc.onconnectionstatechange = () => {
-      if (pc.connectionState === 'connected') {
+      const state = pc.connectionState;
+      if (state === 'connected') {
         setIsVoiceConnected(true);
-      } else if (pc.connectionState === 'disconnected' || pc.connectionState === 'failed' || pc.connectionState === 'closed') {
+      } else if (state === 'disconnected' || state === 'failed' || state === 'closed') {
+        setIsVoiceConnected(false);
+      }
+    };
+
+    pc.oniceconnectionstatechange = () => {
+      const state = pc.iceConnectionState;
+      if (state === 'connected' || state === 'completed') {
+        setIsVoiceConnected(true);
+      } else if (state === 'disconnected' || state === 'failed' || state === 'closed') {
         setIsVoiceConnected(false);
       }
     };
@@ -94,10 +105,27 @@ export default function GameRoom() {
     return pc;
   };
 
+  const processQueuedCandidates = async () => {
+    if (pcRef.current && pcRef.current.remoteDescription) {
+      while (iceCandidatesQueueRef.current.length > 0) {
+        const candidate = iceCandidatesQueueRef.current.shift();
+        try {
+          await pcRef.current.addIceCandidate(new RTCIceCandidate(candidate));
+        } catch (e) {
+          console.error('Error adding queued ICE candidate:', e);
+        }
+      }
+    }
+  };
+
   const handleReceiveOffer = async (senderSocketId, signal) => {
     try {
       const pc = createPeerConnection(senderSocketId);
       await pc.setRemoteDescription(new RTCSessionDescription(signal));
+      
+      // Process buffered candidates after setting remote description
+      await processQueuedCandidates();
+
       const answer = await pc.createAnswer();
       await pc.setLocalDescription(answer);
       socket.emit('webrtc_signal', {
@@ -114,6 +142,8 @@ export default function GameRoom() {
     try {
       if (pcRef.current) {
         await pcRef.current.setRemoteDescription(new RTCSessionDescription(signal));
+        // Process buffered candidates after setting remote description
+        await processQueuedCandidates();
       }
     } catch (e) {
       console.error('Error setting remote description for answer:', e);
@@ -145,12 +175,14 @@ export default function GameRoom() {
       } else if (signal.type === 'answer') {
         await handleReceiveAnswer(signal);
       } else if (signal.type === 'candidate') {
-        if (pcRef.current && signal.candidate) {
+        if (pcRef.current && pcRef.current.remoteDescription) {
           try {
             await pcRef.current.addIceCandidate(new RTCIceCandidate(signal.candidate));
           } catch (e) {
             console.error('Error adding ICE candidate:', e);
           }
+        } else {
+          iceCandidatesQueueRef.current.push(signal.candidate);
         }
       }
     };
@@ -159,6 +191,7 @@ export default function GameRoom() {
 
     return () => {
       socket.off('webrtc_signal', handleWebRTCSignal);
+      iceCandidatesQueueRef.current = [];
     };
   }, [socket, room]);
 
@@ -340,26 +373,31 @@ export default function GameRoom() {
           </button>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5 sm:gap-2">
           {/* Voice Chat Toggle Button */}
           {room?.players?.length === 2 && (
             <button
               onClick={handleToggleVoice}
-              className={`btn-geo text-xs sm:text-sm py-1.5 sm:py-2 px-3 sm:px-4 flex items-center gap-1.5 transition-all ${
+              className={`btn-geo text-xs sm:text-sm py-1.5 sm:py-2 px-2 sm:px-3 flex items-center gap-1 transition-all ${
                 isVoiceConnected
-                  ? 'bg-[#06D6A0] text-[#1E1E24] animate-pulse-slow'
+                  ? 'bg-[#06D6A0] text-[#1E1E24] animate-pulse-slow border-[2px] border-[#1E1E24]'
                   : isVoiceActive
-                  ? 'bg-[#FFD166] text-[#1E1E24]'
-                  : 'bg-white text-[#1E1E24]'
+                  ? 'bg-[#FFD166] text-[#1E1E24] border-[2px] border-[#1E1E24]'
+                  : 'bg-white text-[#1E1E24] border-[2px] border-[#1E1E24]'
               }`}
             >
-              {isVoiceActive ? <Mic className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-[#FF5A5F]" /> : <MicOff className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-[#5C5C66]" />}
+              {isVoiceActive ? <Mic className="w-3.5 h-3.5 text-[#FF5A5F] flex-shrink-0" /> : <MicOff className="w-3.5 h-3.5 text-[#5C5C66] flex-shrink-0" />}
               <span>
-                {isVoiceConnected
-                  ? 'Voice Connected 🟢'
-                  : isVoiceActive
-                  ? 'Connecting Mic... ⏳'
-                  : 'Enable Voice Chat'}
+                <span className="hidden sm:inline font-bold">
+                  {isVoiceConnected
+                    ? 'Voice Connected 🟢'
+                    : isVoiceActive
+                    ? 'Connecting Mic... ⏳'
+                    : 'Enable Voice'}
+                </span>
+                <span className="sm:hidden text-[10px] font-bold">
+                  {isVoiceConnected ? 'Voice 🟢' : isVoiceActive ? 'Voice ⏳' : 'Voice'}
+                </span>
               </span>
             </button>
           )}
@@ -367,18 +405,20 @@ export default function GameRoom() {
           {/* Mobile Chat Toggle Button */}
           <button
             onClick={() => setIsMobileChatOpen(!isMobileChatOpen)}
-            className="lg:hidden btn-geo btn-geo-white text-xs py-1.5 px-3"
+            className="lg:hidden btn-geo btn-geo-white text-xs py-1.5 px-2 sm:px-3 flex items-center gap-1"
           >
-            <MessageCircle className="w-3.5 h-3.5 text-[#6C5CE7]" />
-            <span>Chat ({room.chat?.length || 0})</span>
-            {isMobileChatOpen ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+            <MessageCircle className="w-3.5 h-3.5 text-[#6C5CE7] flex-shrink-0" />
+            <span className="hidden sm:inline">Chat</span>
+            <span>({room.chat?.length || 0})</span>
+            {isMobileChatOpen ? <ChevronUp className="w-3.5 h-3.5 flex-shrink-0" /> : <ChevronDown className="w-3.5 h-3.5 flex-shrink-0" />}
           </button>
 
           <button
             onClick={leaveRoom}
-            className="btn-geo btn-geo-coral text-xs sm:text-sm py-1.5 sm:py-2 px-3 sm:px-4"
+            className="btn-geo btn-geo-coral text-xs sm:text-sm py-1.5 sm:py-2 px-2 sm:px-4 flex items-center gap-1"
           >
-            <LogOut className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> Leave
+            <LogOut className="w-3.5 h-3.5 sm:w-4 sm:h-4 flex-shrink-0" />
+            <span className="hidden sm:inline font-bold">Leave</span>
           </button>
         </div>
       </div>
