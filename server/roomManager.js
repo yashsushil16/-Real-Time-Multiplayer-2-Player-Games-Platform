@@ -185,6 +185,20 @@ export class RoomManager {
     return { reset: false, room, votes: room.rematchVotes.size };
   }
 
+  updatePlayerProfile(socketId, newUser) {
+    for (const [roomId, room] of this.rooms.entries()) {
+      const playerIndex = room.players.findIndex(p => p.socketId === socketId);
+      if (playerIndex !== -1) {
+        room.players[playerIndex].id = newUser.id;
+        room.players[playerIndex].name = newUser.name;
+        room.players[playerIndex].avatar = newUser.avatar;
+        room.players[playerIndex].picture = newUser.picture || null;
+        return room;
+      }
+    }
+    return null;
+  }
+
   handleDisconnect(socketId) {
     this.removeFromQueue(socketId);
 

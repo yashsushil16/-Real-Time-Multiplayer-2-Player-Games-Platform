@@ -90,6 +90,10 @@ export function SocketProvider({ children }) {
     setUser(updated);
     localStorage.setItem('arcade_user', JSON.stringify(updated));
 
+    if (socket) {
+      socket.emit('update_profile', { user: updated });
+    }
+
     try {
       await fetch(`${SERVER_URL}/api/user/profile`, {
         method: 'POST',
@@ -112,8 +116,8 @@ export function SocketProvider({ children }) {
   const loginWithGoogle = async ({ token, googleUser, isSimulated }) => {
     try {
       const payload = token 
-        ? { token } 
-        : { isSimulated: true, ...googleUser };
+        ? { token, guestUserId: user?.id } 
+        : { isSimulated: true, guestUserId: user?.id, ...googleUser };
 
       const res = await fetch(`${SERVER_URL}/api/auth/google`, {
         method: 'POST',
@@ -129,6 +133,11 @@ export function SocketProvider({ children }) {
         };
         setUser(fullUser);
         localStorage.setItem('arcade_user', JSON.stringify(fullUser));
+        
+        if (socket) {
+          socket.emit('update_profile', { user: fullUser });
+        }
+
         audio.playWin();
       } else {
         throw new Error(data.error || 'Authentication failed');

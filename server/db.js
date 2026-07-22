@@ -205,6 +205,113 @@ class StorageAdapter {
 
     return match;
   }
+
+  async mergeGuestAccount(guestUserId, googleUserId) {
+    if (!guestUserId || !googleUserId || guestUserId === googleUserId) return null;
+
+    // Load local users
+    const guestUserIndex = this.localData.users.findIndex(u => u.id === guestUserId);
+    const googleUser = this.localData.users.find(u => u.id === googleUserId);
+
+    if (guestUserIndex !== -1 && googleUser) {
+      const guestUser = this.localData.users[guestUserIndex];
+
+      // Merge stats
+      if (googleUser.wins === 0 && googleUser.losses === 0 && googleUser.draws === 0 && googleUser.elo === 1000) {
+        googleUser.wins = guestUser.wins;
+        googleUser.losses = guestUser.losses;
+        googleUser.draws = guestUser.draws;
+        googleUser.elo = guestUser.elo;
+      } else {
+        googleUser.wins += guestUser.wins;
+        googleUser.losses += guestUser.losses;
+        googleUser.draws += guestUser.draws;
+        googleUser.elo = Math.max(googleUser.elo, guestUser.elo);
+      }
+
+      // Remove guest user from local users list
+      this.localData.users.splice(guestUserIndex, 1);
+
+      // Update local matches history where the guest played
+      this.localData.matches.forEach(m => {
+        if (m.player1 && m.player1.id === guestUserId) {
+          m.player1.id = googleUserId;
+          m.player1.name = googleUser.name;
+          m.player1.picture = googleUser.picture;
+          m.player1.avatar = googleUser.avatar;
+        }
+        if (m.player2 && m.player2.id === guestUserId) {
+          m.player2.id = googleUserId;
+          m.player2.name = googleUser.name;
+          m.player2.picture = googleUser.picture;
+          m.player2.avatar = googleUser.avatar;
+        }
+      });
+
+      this.saveLocalData();
+    }
+
+    // Update MongoDB if connected
+    if (this.isMongoConnected) {
+      try {
+        const guestUserDb = await User.findOne({ id: guestUserId });
+        const googleUserDb = await User.findOne({ id: googleUserId });
+
+        if (guestUserDb && googleUserDb) {
+          // Merge stats in MongoDB
+          if (googleUserDb.wins === 0 && googleUserDb.losses === 0 && googleUserDb.draws === 0 && googleUserDb.elo === 1000) {
+            googleUserDb.wins = guestUserDb.wins;
+            googleUserDb.losses = guestUserDb.losses;
+            googleUserDb.draws = guestUserDb.draws;
+            googleUserDb.elo = guestUserDb.elo;
+          } else {
+            googleUserDb.wins += guestUserDb.wins;
+            googleUserDb.losses += guestUserDb.losses;
+            googleUserDb.draws += guestUserDb.draws;
+            googleUserDb.elo = Math.max(googleUserDb.elo, guestUserDb.elo);
+          }
+          await googleUserDb.save();
+          await User.deleteOne({ id: guestUserId });
+        }
+
+        // Update MongoDB matches
+        await Match.updateMany(
+          { 'player1.id': guestUserId },
+          { 
+            $set: { 
+              'player1.id': googleUserId, 
+              'player1.name': googleUser ? googleUser.name : (googleUserDb ? googleUserDb.name : 'Player'), 
+              'player1.picture': googleUser ? googleUser.picture : (googleUserDb ? googleUserDb.picture : null),
+              'player1.avatar': googleUser ? googleUser.avatar : (googleUserDb ? googleUserDb.avatar : '🎮') 
+            } 
+          }
+        );
+        await Match.updateMany(
+          { 'player2.id': guestUserId },
+          { 
+            $set: { 
+              'player2.id': googleUserId, 
+              'player2.name': googleUser ? googleUser.name : (googleUserDb ? googleUserDb.name : 'Player'), 
+              'player2.picture': googleUser ? googleUser.picture : (googleUserDb ? googleUserDb.picture : null),
+              'player2.avatar': googleUser ? googleUser.avatar : (googleUserDb ? googleUserDb.avatar : '🎮') 
+            } 
+          }
+        );
+      } catch (err) {
+        console.error('Mongo merge guest account error:', err);
+      }
+    }
+
+    // Return the updated Google user
+    if (this.isMongoConnected) {
+      try {
+        return await User.findOne({ id: googleUserId }).lean();
+      } catch (err) {
+        console.error('Mongo find user error after merge:', err);
+      }
+    }
+    return this.localData.users.find(u => u.id === googleUserId);
+  }
 }
 
 export const db = new StorageAdapter();

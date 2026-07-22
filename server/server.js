@@ -52,7 +52,7 @@ app.get('/api/matches', async (req, res) => {
 
 app.post('/api/auth/google', async (req, res) => {
   try {
-    const { token, isSimulated, googleId, name, email, picture } = req.body;
+    const { token, isSimulated, googleId, name, email, picture, guestUserId } = req.body;
 
     let userData;
 
@@ -96,7 +96,12 @@ app.post('/api/auth/google', async (req, res) => {
       isGoogle: true
     });
 
-    res.json({ success: true, user });
+    let finalUser = user;
+    if (guestUserId && guestUserId !== user.id) {
+      finalUser = await db.mergeGuestAccount(guestUserId, user.id) || user;
+    }
+
+    res.json({ success: true, user: finalUser });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
@@ -228,6 +233,18 @@ io.on('connection', (socket) => {
     if (result) {
       io.to(roomId).emit('rematch_status', result);
       io.to(roomId).emit('room_updated', result.room);
+    }
+  });
+
+  // Update Profile
+  socket.on('update_profile', ({ user }) => {
+    try {
+      const room = roomManager.updatePlayerProfile(socket.id, user);
+      if (room) {
+        io.to(room.id).emit('room_updated', room);
+      }
+    } catch (err) {
+      console.error('Error updating profile in room:', err.message);
     }
   });
 
