@@ -89,8 +89,8 @@ export default function GameRoom() {
     }
   };
 
-  const player1 = room.players[0];
-  const player2 = room.players[1];
+  const player1 = room?.players?.[0];
+  const player2 = room?.players?.[1];
 
   return (
     <div className="max-w-6xl mx-auto px-3 sm:px-4 py-4 sm:py-6 space-y-4 sm:space-y-6">
@@ -101,7 +101,7 @@ export default function GameRoom() {
             🎮 {room.gameName}
           </span>
           
-          {room.players.length === 2 && (
+          {room?.players?.length === 2 && (
             <div className="relative">
               <button
                 onClick={() => setShowGameSwitcher(!showGameSwitcher)}
@@ -256,7 +256,7 @@ export default function GameRoom() {
 
           {/* Active Game Board View */}
           <div className="card-geo bg-white p-3 sm:p-6 relative overflow-hidden">
-            {room.players.length < 2 ? (
+            {room?.players?.length < 2 ? (
               <div className="text-center py-8 sm:py-12 space-y-4">
                 <div className="w-14 h-14 sm:w-16 sm:h-16 mx-auto rounded-2xl bg-[#FFD166] border-[3px] border-[#1E1E24] shadow-[4px_4px_0px_#1E1E24] flex items-center justify-center text-2xl sm:text-3xl animate-bounce">
                   ⏳

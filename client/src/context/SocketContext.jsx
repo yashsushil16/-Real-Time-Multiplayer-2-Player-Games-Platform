@@ -217,7 +217,7 @@ export function SocketProvider({ children }) {
         setIsSearchingQuickMatch(false);
         setSearchingGameType(null);
         setRoom(res.room);
-        const idx = res.room.players.findIndex(p => p.id === user.id);
+        const idx = res.room?.players?.findIndex(p => p.id === user.id) ?? -1;
         setPlayerIndex(idx !== -1 ? idx : 0);
       }
     });
