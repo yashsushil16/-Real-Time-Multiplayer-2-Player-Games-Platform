@@ -255,6 +255,18 @@ export function SocketProvider({ children }) {
     setPlayerIndex(null);
   };
 
+  const switchGame = (gameType, callback) => {
+    if (!socket || !room) return;
+    audio.playClick();
+    socket.emit('switch_game', { roomId: room.id, gameType }, (res) => {
+      if (callback) callback(res);
+      if (!res.success) {
+        setErrorMsg(res.error);
+        setTimeout(() => setErrorMsg(null), 3000);
+      }
+    });
+  };
+
   const toggleSound = () => {
     const muted = audio.toggleMute();
     setIsMuted(muted);
@@ -285,6 +297,7 @@ export function SocketProvider({ children }) {
         sendChat,
         requestRematch,
         leaveRoom,
+        switchGame,
         toggleSound,
         setErrorMsg
       }}

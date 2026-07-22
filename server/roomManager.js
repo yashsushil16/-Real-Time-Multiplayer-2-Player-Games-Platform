@@ -42,8 +42,9 @@ export class RoomManager {
       spectators: [],
       gameState: initialGameState,
       chat: [],
-      rematchVotes: new Set(),
-      createdAt: Date.now()
+      rematchVotes: [],
+      createdAt: Date.now(),
+      accumulatedScores: {}
     };
 
     this.rooms.set(roomId, room);
@@ -75,6 +76,14 @@ export class RoomManager {
         isReady: true
       });
       const playerIndex = room.players.length - 1;
+
+      // Initialize accumulatedScores
+      if (!room.accumulatedScores) room.accumulatedScores = {};
+      room.accumulatedScores[user.id] = 0;
+      if (room.players[0]) {
+        room.accumulatedScores[room.players[0].id] = room.accumulatedScores[room.players[0].id] || 0;
+      }
+      room.accumulatedScores.draws = room.accumulatedScores.draws || 0;
 
       if (room.players.length === 2) {
         room.gameState.status = 'playing';
@@ -132,6 +141,19 @@ export class RoomManager {
         winnerName = room.players[room.gameState.winner]?.name;
       }
 
+      // Increment room-level accumulated scores
+      if (!room.accumulatedScores) {
+        room.accumulatedScores = {};
+      }
+      if (room.gameState.isDraw) {
+        room.accumulatedScores.draws = (room.accumulatedScores.draws || 0) + 1;
+      } else if (room.gameState.winner !== null) {
+        const winnerPlayer = room.players[room.gameState.winner];
+        if (winnerPlayer) {
+          room.accumulatedScores[winnerPlayer.id] = (room.accumulatedScores[winnerPlayer.id] || 0) + 1;
+        }
+      }
+
       await db.recordMatch({
         gameType: room.gameType,
         gameName: room.gameName,
@@ -173,16 +195,25 @@ export class RoomManager {
     const room = this.rooms.get(roomId);
     if (!room) return null;
 
-    room.rematchVotes.add(socketId);
+    const player = room.players.find(p => p.socketId === socketId);
+    if (!player) return null;
 
-    if (room.rematchVotes.size >= 2) {
+    if (!room.rematchVotes) {
+      room.rematchVotes = [];
+    }
+
+    if (!room.rematchVotes.includes(player.id)) {
+      room.rematchVotes.push(player.id);
+    }
+
+    if (room.rematchVotes.length >= 2) {
       room.gameState = createInitialGameState(room.gameType);
       room.gameState.status = 'playing';
-      room.rematchVotes.clear();
+      room.rematchVotes = [];
       return { reset: true, room };
     }
 
-    return { reset: false, room, votes: room.rematchVotes.size };
+    return { reset: false, room, votes: room.rematchVotes.length };
   }
 
   updatePlayerProfile(socketId, newUser) {
@@ -199,6 +230,40 @@ export class RoomManager {
     return null;
   }
 
+  switchGame({ roomId, gameType, socketId }) {
+    const room = this.rooms.get(roomId);
+    if (!room) return { success: false, error: 'Room not found' };
+
+    const playerIndex = room.players.findIndex(p => p.socketId === socketId);
+    if (playerIndex === -1) return { success: false, error: 'Only players can switch games' };
+
+    const initialGameState = createInitialGameState(gameType);
+    room.gameType = gameType;
+    room.gameName = initialGameState.gameName;
+    room.gameState = initialGameState;
+
+    if (room.players.length === 2) {
+      room.gameState.status = 'playing';
+    }
+
+    room.rematchVotes = [];
+
+    // System chat notification
+    const chatMsg = {
+      id: 'chat_' + Date.now(),
+      sender: 'System 🤖',
+      avatar: '🤖',
+      picture: null,
+      message: `Game switched to ${room.gameName}!`,
+      type: 'text',
+      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    };
+    room.chat.push(chatMsg);
+    if (room.chat.length > 30) room.chat.shift();
+
+    return { success: true, room };
+  }
+
   handleDisconnect(socketId) {
     this.removeFromQueue(socketId);
 
@@ -206,6 +271,7 @@ export class RoomManager {
       const playerIndex = room.players.findIndex(p => p.socketId === socketId);
       if (playerIndex !== -1) {
         room.players[playerIndex].disconnected = true;
+        room.rematchVotes = []; // Clear rematch votes on player disconnect
         
         setTimeout(() => {
           const currentRoom = this.rooms.get(roomId);

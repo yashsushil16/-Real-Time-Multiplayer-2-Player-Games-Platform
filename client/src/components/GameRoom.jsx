@@ -9,15 +9,28 @@ import DotsAndBoxesBoard from './boards/DotsAndBoxesBoard';
 import CheckersBoard from './boards/CheckersBoard';
 import { audio } from '../utils/audio';
 
+const GAMES_LIST = [
+  { id: 'rockPaperScissors', title: 'Rock Paper Scissors', icon: '✂️' },
+  { id: 'ticTacToe', title: 'Tic-Tac-Toe', icon: '❌' },
+  { id: 'connectFour', title: 'Connect 4', icon: '🟡' },
+  { id: 'dotsAndBoxes', title: 'Dots & Boxes', icon: '🔳' },
+  { id: 'checkers', title: 'Checkers', icon: '🔴' }
+];
+
 export default function GameRoom() {
-  const { room, user, playerIndex, leaveRoom, sendChat, requestRematch } = useSocket();
+  const { room, user, playerIndex, leaveRoom, sendChat, requestRematch, switchGame } = useSocket();
   const [chatInput, setChatInput] = useState('');
   const [copiedCode, setCopiedCode] = useState(false);
   const [isMobileChatOpen, setIsMobileChatOpen] = useState(false);
+  const [showGameSwitcher, setShowGameSwitcher] = useState(false);
   const chatEndRef = useRef(null);
 
   const gameState = room?.gameState;
   const isFinished = gameState?.status === 'finished';
+
+  const opponent = room?.players?.find(p => p.id !== user.id);
+  const hasOpponentRequested = opponent && room?.rematchVotes?.includes(opponent.id);
+  const hasIRequested = room?.rematchVotes?.includes(user.id);
 
   useEffect(() => {
     if (isFinished) {
@@ -88,6 +101,39 @@ export default function GameRoom() {
             🎮 {room.gameName}
           </span>
           
+          {room.players.length === 2 && (
+            <div className="relative">
+              <button
+                onClick={() => setShowGameSwitcher(!showGameSwitcher)}
+                className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-[#FFD166] border-[2px] border-[#1E1E24] shadow-[1.5px_1.5px_0px_#1E1E24] text-xs sm:text-sm font-bold hover:bg-[#FF70A6] transition-all"
+              >
+                <span>🔄 Switch Game</span>
+              </button>
+              {showGameSwitcher && (
+                <div className="absolute left-0 mt-2 w-48 bg-white border-[3px] border-[#1E1E24] shadow-[4px_4px_0px_#1E1E24] rounded-xl z-50 overflow-hidden font-['Fredoka']">
+                  {GAMES_LIST.map((game) => (
+                    <button
+                      key={game.id}
+                      disabled={game.id === room.gameType}
+                      onClick={() => {
+                        switchGame(game.id);
+                        setShowGameSwitcher(false);
+                      }}
+                      className={`w-full text-left px-3 py-2 text-xs sm:text-sm border-b-[2px] border-[#1E1E24] last:border-b-0 flex items-center gap-2 transition-all ${
+                        game.id === room.gameType
+                          ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                          : 'hover:bg-[#06D6A0] text-[#1E1E24]'
+                      }`}
+                    >
+                      <span>{game.icon}</span>
+                      <span className="font-semibold">{game.title}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
           <button
             onClick={copyRoomCode}
             className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-gray-100 border-[2px] border-[#1E1E24] shadow-[1.5px_1.5px_0px_#1E1E24] font-mono text-xs sm:text-sm font-bold hover:bg-[#FFD166] transition-all"
@@ -116,6 +162,44 @@ export default function GameRoom() {
           </button>
         </div>
       </div>
+
+      {/* Championship Scoreboard */}
+      {player1 && player2 && room.accumulatedScores && (
+        <div className="card-geo bg-white border-[3px] border-[#1E1E24] shadow-[4px_4px_0px_#1E1E24] p-3 sm:p-4 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-3">
+          <div className="flex items-center gap-2 font-['Fredoka'] font-extrabold text-[#1E1E24] text-sm sm:text-base">
+            <span className="text-xl sm:text-2xl animate-pulse-slow">🏆</span>
+            <span>Championship Scoreboard</span>
+          </div>
+
+          <div className="flex items-center gap-4 sm:gap-6 font-bold text-[#1E1E24] text-xs sm:text-sm">
+            {/* Player 1 Score */}
+            <div className="flex items-center gap-1.5 sm:gap-2">
+              <span className="text-base sm:text-lg">{player1.avatar}</span>
+              <span className="max-w-[70px] sm:max-w-[120px] truncate font-semibold">{player1.name}</span>
+              <span className="badge-geo badge-purple py-0.5 px-2.5 text-xs font-extrabold">
+                {room.accumulatedScores[player1.id] || 0}
+              </span>
+            </div>
+
+            <div className="text-gray-400 font-extrabold text-xs">VS</div>
+
+            {/* Player 2 Score */}
+            <div className="flex items-center gap-1.5 sm:gap-2">
+              <span className="badge-geo badge-teal py-0.5 px-2.5 text-xs font-extrabold">
+                {room.accumulatedScores[player2.id] || 0}
+              </span>
+              <span className="max-w-[70px] sm:max-w-[120px] truncate font-semibold">{player2.name}</span>
+              <span className="text-base sm:text-lg">{player2.avatar}</span>
+            </div>
+
+            {room.accumulatedScores.draws > 0 && (
+              <div className="border-l-[2px] border-gray-200 pl-4 text-xs font-bold text-gray-500">
+                Draws: {room.accumulatedScores.draws}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Main Gameplay Arena */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6 items-start">
@@ -200,16 +284,28 @@ export default function GameRoom() {
                     : (gameState.winner === playerIndex ? "Victory is Yours!" : "Better Luck Next Time!")}
                 </h3>
                 <p className="text-xs sm:text-sm font-bold text-[#1E1E24]/80 mt-1">
-                  Match ended. Hit rematch to play again!
+                  {hasOpponentRequested && !hasIRequested
+                    ? `🔄 ${opponent.name} wants a rematch! Click Rematch to accept.`
+                    : hasIRequested
+                    ? "⏳ Waiting for opponent to accept rematch..."
+                    : "Match ended. Hit rematch to play again!"}
                 </p>
               </div>
 
               <div className="flex justify-center gap-3">
                 <button
                   onClick={requestRematch}
-                  className="btn-geo btn-geo-primary text-sm sm:text-base py-2.5 px-6"
+                  disabled={hasIRequested}
+                  className={`btn-geo text-sm sm:text-base py-2.5 px-6 ${
+                    hasOpponentRequested && !hasIRequested
+                      ? 'btn-geo-primary animate-pulse-slow'
+                      : hasIRequested
+                      ? 'bg-gray-200 border-[#1E1E24] opacity-75 cursor-not-allowed'
+                      : 'btn-geo-primary'
+                  }`}
                 >
-                  <RotateCcw className="w-4 h-4 sm:w-5 sm:h-5" /> Rematch
+                  <RotateCcw className="w-4 h-4 sm:w-5 sm:h-5" />
+                  {hasOpponentRequested && !hasIRequested ? 'Accept Rematch' : 'Rematch'}
                 </button>
               </div>
             </div>

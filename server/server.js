@@ -210,14 +210,25 @@ io.on('connection', (socket) => {
   });
 
   // Make Game Move
-  socket.on('make_move', ({ roomId, move }) => {
-    const result = roomManager.handleMove({ roomId, socketId: socket.id, move });
+  socket.on('make_move', async ({ roomId, move }) => {
+    const result = await roomManager.handleMove({ roomId, socketId: socket.id, move });
     if (result.error) {
       socket.emit('move_error', { message: result.error });
       return;
     }
 
     io.to(roomId).emit('room_updated', result.room);
+  });
+
+  // Switch Active Game in Room
+  socket.on('switch_game', ({ roomId, gameType }, callback) => {
+    const result = roomManager.switchGame({ roomId, gameType, socketId: socket.id });
+    if (result.success) {
+      io.to(roomId).emit('room_updated', result.room);
+      if (callback) callback({ success: true });
+    } else {
+      if (callback) callback({ success: false, error: result.error });
+    }
   });
 
   // Send In-Room Chat / Emoji
