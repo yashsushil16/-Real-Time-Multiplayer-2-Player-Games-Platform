@@ -144,6 +144,8 @@ export function SocketProvider({ children }) {
       }
     } catch (err) {
       console.error('Google login server error:', err);
+      setErrorMsg(err.message || 'Google login failed');
+      setTimeout(() => setErrorMsg(null), 5000);
       // Fallback local set
       const fallbackUser = googleUser || {};
       if (fallbackUser.googleId) {

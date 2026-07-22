@@ -65,9 +65,10 @@ app.post('/api/auth/google', async (req, res) => {
       const payload = await response.json();
 
       // Optionally verify audience matches client ID if GOOGLE_CLIENT_ID env var is set
-      const serverGoogleClientId = process.env.GOOGLE_CLIENT_ID;
+      const serverGoogleClientId = (process.env.GOOGLE_CLIENT_ID || '').replace(/^['"]|['"]$/g, '').trim();
       if (serverGoogleClientId && payload.aud !== serverGoogleClientId) {
-        return res.status(401).json({ success: false, error: 'Token audience mismatch' });
+        console.error(`Google Auth Mismatch: Token audience is '${payload.aud}', but server is configured with '${serverGoogleClientId}'.`);
+        return res.status(401).json({ success: false, error: `Token audience mismatch. Token aud: ${payload.aud}` });
       }
 
       userData = {
