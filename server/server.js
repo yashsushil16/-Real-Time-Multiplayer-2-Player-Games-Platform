@@ -52,16 +52,47 @@ app.get('/api/matches', async (req, res) => {
 
 app.post('/api/auth/google', async (req, res) => {
   try {
-    const { googleId, name, email, picture } = req.body;
-    if (!googleId) return res.status(400).json({ success: false, error: 'Google ID is required' });
+    const { token, isSimulated, googleId, name, email, picture } = req.body;
 
-    const userId = 'usr_g_' + googleId;
+    let userData;
+
+    if (token) {
+      // Secure Google Token Verification
+      const response = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(token)}`);
+      if (!response.ok) {
+        return res.status(401).json({ success: false, error: 'Invalid Google OAuth token' });
+      }
+      const payload = await response.json();
+
+      // Optionally verify audience matches client ID if GOOGLE_CLIENT_ID env var is set
+      const serverGoogleClientId = process.env.GOOGLE_CLIENT_ID;
+      if (serverGoogleClientId && payload.aud !== serverGoogleClientId) {
+        return res.status(401).json({ success: false, error: 'Token audience mismatch' });
+      }
+
+      userData = {
+        googleId: payload.sub,
+        name: payload.name,
+        email: payload.email,
+        picture: payload.picture
+      };
+    } else if (isSimulated) {
+      // Simulated dev login fallback
+      if (!googleId) {
+        return res.status(400).json({ success: false, error: 'Google ID is required for simulation' });
+      }
+      userData = { googleId, name, email, picture };
+    } else {
+      return res.status(400).json({ success: false, error: 'Either token or simulated login details are required' });
+    }
+
+    const userId = 'usr_g_' + userData.googleId;
     const user = await db.upsertUser({
       userId,
-      googleId,
-      name,
-      email,
-      picture,
+      googleId: userData.googleId,
+      name: userData.name,
+      email: userData.email,
+      picture: userData.picture,
       isGoogle: true
     });
 

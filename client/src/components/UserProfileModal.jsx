@@ -54,13 +54,9 @@ export default function UserProfileModal({ isOpen, onClose }) {
   };
 
   const handleGoogleCallback = (response) => {
-    const payload = parseJwt(response.credential);
-    if (payload) {
+    if (response.credential) {
       loginWithGoogle({
-        googleId: payload.sub,
-        name: payload.name,
-        email: payload.email,
-        picture: payload.picture
+        token: response.credential
       });
       onClose();
     }
@@ -128,29 +124,41 @@ export default function UserProfileModal({ isOpen, onClose }) {
           </div>
         ) : (
           <div className="space-y-3">
-            {GOOGLE_CLIENT_ID ? (
+            {!GOOGLE_CLIENT_ID && (
+              <div className="rounded-xl border-[2px] border-amber-300 bg-amber-50/50 p-3 space-y-2.5">
+                <div className="flex gap-2">
+                  <span className="text-lg">⚠️</span>
+                  <div className="text-xs text-amber-800 leading-relaxed font-semibold">
+                    <p className="font-bold mb-0.5">Google OAuth is not configured.</p>
+                    <p>To enable real Google Sign-In, please set the <code className="bg-amber-100/80 px-1 py-0.5 rounded font-mono text-[10px]">VITE_GOOGLE_CLIENT_ID</code> environment variable in your <code className="bg-amber-100/80 px-1 py-0.5 rounded font-mono text-[10px]">client/.env</code> file.</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => {
+                    loginWithGoogle({
+                      isSimulated: true,
+                      googleUser: {
+                        googleId: 'g_demo_' + Math.floor(100000 + Math.random() * 900000),
+                        name: 'Yash Sushil (Dev Mode)',
+                        email: 'yash.sushil16@gmail.com',
+                        picture: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=120&q=80'
+                      }
+                    });
+                    onClose();
+                  }}
+                  className="btn-geo btn-geo-white w-full py-2 text-xs flex justify-center items-center gap-2"
+                >
+                  <img
+                    src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg"
+                    alt="Google"
+                    className="w-3.5 h-3.5 opacity-60"
+                  />
+                  <span>Continue with Simulated Account (Dev Mode)</span>
+                </button>
+              </div>
+            )}
+            {GOOGLE_CLIENT_ID && (
               <div id="googleSignInBtn" className="w-full flex justify-center" />
-            ) : (
-              <button
-                onClick={() => {
-                  // Instant Demo Google Account Login
-                  loginWithGoogle({
-                    googleId: 'g_demo_' + Math.floor(100000 + Math.random() * 900000),
-                    name: 'Yash Sushil',
-                    email: 'yash.sushil16@gmail.com',
-                    picture: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=120&q=80'
-                  });
-                  onClose();
-                }}
-                className="btn-geo btn-geo-white w-full py-2.5 text-sm"
-              >
-                <img
-                  src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg"
-                  alt="Google"
-                  className="w-4 h-4"
-                />
-                Sign in with Google Account
-              </button>
             )}
           </div>
         )}

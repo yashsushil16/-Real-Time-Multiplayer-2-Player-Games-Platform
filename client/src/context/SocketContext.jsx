@@ -109,40 +109,47 @@ export function SocketProvider({ children }) {
     }
   };
 
-  const loginWithGoogle = async (googleUser) => {
-    // googleUser = { googleId, name, email, picture }
+  const loginWithGoogle = async ({ token, googleUser, isSimulated }) => {
     try {
+      const payload = token 
+        ? { token } 
+        : { isSimulated: true, ...googleUser };
+
       const res = await fetch(`${SERVER_URL}/api/auth/google`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(googleUser)
+        body: JSON.stringify(payload)
       });
       const data = await res.json();
       if (data.success) {
         const fullUser = {
           ...data.user,
           avatar: data.user.avatar || '👑',
-          picture: googleUser.picture,
           isGoogle: true
         };
         setUser(fullUser);
         localStorage.setItem('arcade_user', JSON.stringify(fullUser));
         audio.playWin();
+      } else {
+        throw new Error(data.error || 'Authentication failed');
       }
     } catch (err) {
       console.error('Google login server error:', err);
       // Fallback local set
-      const localUser = {
-        id: 'usr_g_' + googleUser.googleId,
-        googleId: googleUser.googleId,
-        name: googleUser.name,
-        email: googleUser.email,
-        picture: googleUser.picture,
-        avatar: '👑',
-        isGoogle: true
-      };
-      setUser(localUser);
-      localStorage.setItem('arcade_user', JSON.stringify(localUser));
+      const fallbackUser = googleUser || {};
+      if (fallbackUser.googleId) {
+        const localUser = {
+          id: 'usr_g_' + fallbackUser.googleId,
+          googleId: fallbackUser.googleId,
+          name: fallbackUser.name,
+          email: fallbackUser.email,
+          picture: fallbackUser.picture,
+          avatar: '👑',
+          isGoogle: true
+        };
+        setUser(localUser);
+        localStorage.setItem('arcade_user', JSON.stringify(localUser));
+      }
     }
   };
 
