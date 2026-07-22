@@ -248,6 +248,19 @@ io.on('connection', (socket) => {
     }
   });
 
+  // Toggle Voice Chat Active Status
+  socket.on('toggle_voice', ({ roomId, enabled }) => {
+    const room = roomManager.toggleVoice({ roomId, socketId: socket.id, enabled });
+    if (room) {
+      io.to(roomId).emit('room_updated', room);
+    }
+  });
+
+  // Relay WebRTC Signals to Opponent
+  socket.on('webrtc_signal', ({ roomId, targetSocketId, signal }) => {
+    io.to(targetSocketId).emit('webrtc_signal', { senderSocketId: socket.id, signal });
+  });
+
   // Update Profile
   socket.on('update_profile', ({ user }) => {
     try {

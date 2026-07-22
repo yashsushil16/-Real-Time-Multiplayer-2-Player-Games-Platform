@@ -272,6 +272,11 @@ export function SocketProvider({ children }) {
     setIsMuted(muted);
   };
 
+  const toggleVoiceChat = (enabled) => {
+    if (!socket || !room) return;
+    socket.emit('toggle_voice', { roomId: room.id, enabled });
+  };
+
   return (
     <SocketContext.Provider
       value={{
@@ -298,6 +303,7 @@ export function SocketProvider({ children }) {
         requestRematch,
         leaveRoom,
         switchGame,
+        toggleVoiceChat,
         toggleSound,
         setErrorMsg
       }}

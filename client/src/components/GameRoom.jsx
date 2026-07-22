@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useSocket } from '../context/SocketContext';
 import confetti from 'canvas-confetti';
-import { Copy, Check, LogOut, RotateCcw, Send, MessageCircle, ChevronDown, ChevronUp } from 'lucide-react';
+import { Copy, Check, LogOut, RotateCcw, Send, MessageCircle, ChevronDown, ChevronUp, Mic, MicOff } from 'lucide-react';
 import RPSBoard from './boards/RPSBoard';
 import TicTacToeBoard from './boards/TicTacToeBoard';
 import ConnectFourBoard from './boards/ConnectFourBoard';
@@ -18,7 +18,7 @@ const GAMES_LIST = [
 ];
 
 export default function GameRoom() {
-  const { room, user, playerIndex, leaveRoom, sendChat, requestRematch, switchGame } = useSocket();
+  const { room, user, playerIndex, leaveRoom, sendChat, requestRematch, switchGame, socket, toggleVoiceChat, setErrorMsg } = useSocket();
   const [chatInput, setChatInput] = useState('');
   const [copiedCode, setCopiedCode] = useState(false);
   const [isMobileChatOpen, setIsMobileChatOpen] = useState(false);
@@ -31,6 +31,203 @@ export default function GameRoom() {
   const opponent = room?.players?.find(p => p.id !== user.id);
   const hasOpponentRequested = opponent && room?.rematchVotes?.includes(opponent.id);
   const hasIRequested = room?.rematchVotes?.includes(user.id);
+
+  // WebRTC Voice Chat States & Refs
+  const [isVoiceActive, setIsVoiceActive] = useState(false);
+  const [isVoiceConnected, setIsVoiceConnected] = useState(false);
+  
+  const localStreamRef = useRef(null);
+  const pcRef = useRef(null);
+  const remoteAudioRef = useRef(null);
+
+  const myPlayer = room?.players?.find(p => p.id === user.id);
+  const isMyVoiceEnabled = myPlayer?.voiceEnabled || false;
+  const isOpponentVoiceEnabled = opponent?.voiceEnabled || false;
+
+  const createPeerConnection = (targetSocketId) => {
+    if (pcRef.current) return pcRef.current;
+
+    const pc = new RTCPeerConnection({
+      iceServers: [
+        { urls: 'stun:stun.l.google.com:19302' }
+      ]
+    });
+
+    if (localStreamRef.current) {
+      localStreamRef.current.getTracks().forEach(track => {
+        pc.addTrack(track, localStreamRef.current);
+      });
+    }
+
+    pc.onicecandidate = (event) => {
+      if (event.candidate && socket && room) {
+        socket.emit('webrtc_signal', {
+          roomId: room.id,
+          targetSocketId,
+          signal: { type: 'candidate', candidate: event.candidate }
+        });
+      }
+    };
+
+    pc.onconnectionstatechange = () => {
+      if (pc.connectionState === 'connected') {
+        setIsVoiceConnected(true);
+      } else if (pc.connectionState === 'disconnected' || pc.connectionState === 'failed' || pc.connectionState === 'closed') {
+        setIsVoiceConnected(false);
+      }
+    };
+
+    pc.ontrack = (event) => {
+      const [remoteStream] = event.streams;
+      if (remoteStream) {
+        if (!remoteAudioRef.current) {
+          remoteAudioRef.current = new Audio();
+        }
+        remoteAudioRef.current.srcObject = remoteStream;
+        remoteAudioRef.current.play().catch(err => {
+          console.error('Failed to play remote audio:', err);
+        });
+      }
+    };
+
+    pcRef.current = pc;
+    return pc;
+  };
+
+  const handleReceiveOffer = async (senderSocketId, signal) => {
+    try {
+      const pc = createPeerConnection(senderSocketId);
+      await pc.setRemoteDescription(new RTCSessionDescription(signal));
+      const answer = await pc.createAnswer();
+      await pc.setLocalDescription(answer);
+      socket.emit('webrtc_signal', {
+        roomId: room.id,
+        targetSocketId: senderSocketId,
+        signal: { type: 'answer', sdp: answer.sdp }
+      });
+    } catch (e) {
+      console.error('Error handling WebRTC offer:', e);
+    }
+  };
+
+  const handleReceiveAnswer = async (signal) => {
+    try {
+      if (pcRef.current) {
+        await pcRef.current.setRemoteDescription(new RTCSessionDescription(signal));
+      }
+    } catch (e) {
+      console.error('Error setting remote description for answer:', e);
+    }
+  };
+
+  const startCall = async (targetSocketId) => {
+    try {
+      const pc = createPeerConnection(targetSocketId);
+      const offer = await pc.createOffer();
+      await pc.setLocalDescription(offer);
+      socket.emit('webrtc_signal', {
+        roomId: room.id,
+        targetSocketId,
+        signal: { type: 'offer', sdp: offer.sdp }
+      });
+    } catch (e) {
+      console.error('Error initiating WebRTC call:', e);
+    }
+  };
+
+  // WebRTC Signal Listener
+  useEffect(() => {
+    if (!socket || !room) return;
+
+    const handleWebRTCSignal = async ({ senderSocketId, signal }) => {
+      if (signal.type === 'offer') {
+        await handleReceiveOffer(senderSocketId, signal);
+      } else if (signal.type === 'answer') {
+        await handleReceiveAnswer(signal);
+      } else if (signal.type === 'candidate') {
+        if (pcRef.current && signal.candidate) {
+          try {
+            await pcRef.current.addIceCandidate(new RTCIceCandidate(signal.candidate));
+          } catch (e) {
+            console.error('Error adding ICE candidate:', e);
+          }
+        }
+      }
+    };
+
+    socket.on('webrtc_signal', handleWebRTCSignal);
+
+    return () => {
+      socket.off('webrtc_signal', handleWebRTCSignal);
+    };
+  }, [socket, room]);
+
+  // Peer Connection Trigger
+  useEffect(() => {
+    const isBothEnabled = isMyVoiceEnabled && isOpponentVoiceEnabled;
+
+    if (isBothEnabled) {
+      if (playerIndex === 0 && opponent?.socketId) {
+        startCall(opponent.socketId);
+      }
+    } else {
+      if (pcRef.current) {
+        pcRef.current.close();
+        pcRef.current = null;
+      }
+      setIsVoiceConnected(false);
+      if (remoteAudioRef.current) {
+        remoteAudioRef.current.srcObject = null;
+      }
+    }
+  }, [isMyVoiceEnabled, isOpponentVoiceEnabled, playerIndex, opponent?.socketId]);
+
+  // General Cleanup Effect
+  useEffect(() => {
+    return () => {
+      if (pcRef.current) {
+        pcRef.current.close();
+        pcRef.current = null;
+      }
+      if (localStreamRef.current) {
+        localStreamRef.current.getTracks().forEach(track => track.stop());
+        localStreamRef.current = null;
+      }
+      if (remoteAudioRef.current) {
+        remoteAudioRef.current.srcObject = null;
+      }
+    };
+  }, []);
+
+  const handleToggleVoice = async () => {
+    if (isVoiceActive) {
+      setIsVoiceActive(false);
+      toggleVoiceChat(false);
+      if (localStreamRef.current) {
+        localStreamRef.current.getTracks().forEach(track => track.stop());
+        localStreamRef.current = null;
+      }
+      if (pcRef.current) {
+        pcRef.current.close();
+        pcRef.current = null;
+      }
+      setIsVoiceConnected(false);
+      if (remoteAudioRef.current) {
+        remoteAudioRef.current.srcObject = null;
+      }
+    } else {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        localStreamRef.current = stream;
+        setIsVoiceActive(true);
+        toggleVoiceChat(true);
+      } catch (err) {
+        console.error('Failed to get mic stream:', err);
+        setErrorMsg('Microphone access denied. Please allow microphone permissions.');
+        setTimeout(() => setErrorMsg(null), 5000);
+      }
+    }
+  };
 
   useEffect(() => {
     if (isFinished) {
@@ -144,6 +341,29 @@ export default function GameRoom() {
         </div>
 
         <div className="flex items-center gap-2">
+          {/* Voice Chat Toggle Button */}
+          {room?.players?.length === 2 && (
+            <button
+              onClick={handleToggleVoice}
+              className={`btn-geo text-xs sm:text-sm py-1.5 sm:py-2 px-3 sm:px-4 flex items-center gap-1.5 transition-all ${
+                isVoiceConnected
+                  ? 'bg-[#06D6A0] text-[#1E1E24] animate-pulse-slow'
+                  : isVoiceActive
+                  ? 'bg-[#FFD166] text-[#1E1E24]'
+                  : 'bg-white text-[#1E1E24]'
+              }`}
+            >
+              {isVoiceActive ? <Mic className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-[#FF5A5F]" /> : <MicOff className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-[#5C5C66]" />}
+              <span>
+                {isVoiceConnected
+                  ? 'Voice Connected 🟢'
+                  : isVoiceActive
+                  ? 'Connecting Mic... ⏳'
+                  : 'Enable Voice Chat'}
+              </span>
+            </button>
+          )}
+
           {/* Mobile Chat Toggle Button */}
           <button
             onClick={() => setIsMobileChatOpen(!isMobileChatOpen)}
@@ -221,8 +441,15 @@ export default function GameRoom() {
                 )}
               </div>
               <div className="min-w-0">
-                <div className="font-['Fredoka'] font-bold text-xs sm:text-base text-[#1E1E24] truncate">
-                  {player1?.name || 'Waiting...'}
+                <div className="font-['Fredoka'] font-bold text-xs sm:text-base text-[#1E1E24] truncate flex items-center gap-1.5">
+                  <span>{player1?.name || 'Waiting...'}</span>
+                  {player1 && (
+                    player1.voiceEnabled ? (
+                      <Mic className="w-3.5 h-3.5 text-[#06D6A0] flex-shrink-0" />
+                    ) : (
+                      <MicOff className="w-3.5 h-3.5 text-gray-300 flex-shrink-0" />
+                    )
+                  )}
                 </div>
                 <div className="text-[10px] sm:text-xs font-semibold text-[#5C5C66] truncate">
                   {player1 ? (player1.id === user.id ? '(You)' : 'P1') : 'Waiting'}
@@ -244,8 +471,15 @@ export default function GameRoom() {
                 )}
               </div>
               <div className="min-w-0">
-                <div className="font-['Fredoka'] font-bold text-xs sm:text-base text-[#1E1E24] truncate">
-                  {player2?.name || 'Waiting...'}
+                <div className="font-['Fredoka'] font-bold text-xs sm:text-base text-[#1E1E24] truncate flex items-center gap-1.5">
+                  <span>{player2?.name || 'Waiting...'}</span>
+                  {player2 && (
+                    player2.voiceEnabled ? (
+                      <Mic className="w-3.5 h-3.5 text-[#06D6A0] flex-shrink-0" />
+                    ) : (
+                      <MicOff className="w-3.5 h-3.5 text-gray-300 flex-shrink-0" />
+                    )
+                  )}
                 </div>
                 <div className="text-[10px] sm:text-xs font-semibold text-[#5C5C66] truncate">
                   {player2 ? (player2.id === user.id ? '(You)' : 'P2') : 'Share Code'}

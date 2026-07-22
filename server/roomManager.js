@@ -36,7 +36,8 @@ export class RoomManager {
           name: user.name,
           avatar: user.avatar,
           picture: user.picture || null,
-          isReady: false
+          isReady: false,
+          voiceEnabled: false
         }
       ],
       spectators: [],
@@ -73,7 +74,8 @@ export class RoomManager {
         name: user.name,
         avatar: user.avatar,
         picture: user.picture || null,
-        isReady: true
+        isReady: true,
+        voiceEnabled: false
       });
       const playerIndex = room.players.length - 1;
 
@@ -264,6 +266,18 @@ export class RoomManager {
     return { success: true, room };
   }
 
+  toggleVoice({ roomId, socketId, enabled }) {
+    const room = this.rooms.get(roomId);
+    if (!room) return null;
+
+    const player = room.players.find(p => p.socketId === socketId);
+    if (player) {
+      player.voiceEnabled = !!enabled;
+      return room;
+    }
+    return null;
+  }
+
   handleDisconnect(socketId) {
     this.removeFromQueue(socketId);
 
@@ -271,6 +285,7 @@ export class RoomManager {
       const playerIndex = room.players.findIndex(p => p.socketId === socketId);
       if (playerIndex !== -1) {
         room.players[playerIndex].disconnected = true;
+        room.players[playerIndex].voiceEnabled = false; // Reset voice state on disconnect
         room.rematchVotes = []; // Clear rematch votes on player disconnect
         
         setTimeout(() => {
