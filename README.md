@@ -1,6 +1,6 @@
 # 🎮 Yash's Arcade Arena — Real-Time Multiplayer Games Platform
 
-Arcade Arena is a feature-rich, real-time multiplayer 2-player gaming hub. Players can join game lobbies, match up with others, chat, track scores across multiple games, and talk live using built-in peer-to-peer voice chat. 
+Arcade Arena is a feature-rich, real-time multiplayer 2-player gaming hub. Players can join game lobbies, match up with others, chat, and track scores across multiple games.
 
 **This project was created to learn and improve my web development and engineering skills**, specifically focusing on real-time WebSockets communication, WebRTC media streaming, and scalable database integrations.
 
@@ -14,7 +14,7 @@ Arcade Arena is a feature-rich, real-time multiplayer 2-player gaming hub. Playe
 ### 🏆 Global Leaderboard & Match History
 ![Leaderboard](./screenshots/leaderboard.png)
 
-### 🕹️ Real-Time Game Room & WebRTC Voice Chat
+### 🕹️ Real-Time Game Room
 ![Game Room](./screenshots/gameroom.png)
 
 ---
@@ -28,25 +28,22 @@ Arcade Arena is a feature-rich, real-time multiplayer 2-player gaming hub. Playe
    - **Tic-Tac-Toe**: Classic 3-in-a-row board game.
    - **Rock Paper Scissors**: Quick action game with animated results.
 
-2. **P2P Voice Chat (WebRTC)**:
-   - Built-in, zero-dependency **Voice Chat** using WebRTC peer-to-peer audio channels.
-   - Dynamic microphone permissions, ICE candidate buffering to handle race connections, and responsive mute/unmute visual states.
-   - Compact visual layout tailored to scale beautifully for mobile browser screens.
-
-3. **In-Room Game Switching & Multi-Game Scoreboards**:
+2. **In-Room Game Switching & Multi-Game Scoreboards**:
    - Play another game without creating a new room. Switch games mid-session and watch the board reload instantly.
    - A persistent **Championship Scoreboard** banner tracks overall wins, losses, and draws for players during their session.
 
-4. **Lobby & Matchmaking System**:
+3. **Lobby & Matchmaking System**:
    - **Create / Join Rooms**: Create a room with a custom 6-digit code.
    - **Quick Match**: A WebSocket matchmaking queue that pairs random players instantly.
    - **Interactive Rematches**: Real-time status prompts showing if the opponent wants a rematch, guiding interaction with pulsing Accept button triggers.
    - **In-Game Chat**: Share messages and custom emojis in the room.
 
-5. **Authentication & User Profile Customization**:
+4. **Authentication & User Profile Customization**:
    - Guest profile generator with random names and retro avatar selections.
    - Seamless **Google OAuth 2.0** login.
    - MongoDB-backed Global Rankings, Leaderboard statistics, and match history logs.
+
+*Note: P2P Voice Chat is also integrated experimentally inside rooms for connected players.*
 
 ---
 
