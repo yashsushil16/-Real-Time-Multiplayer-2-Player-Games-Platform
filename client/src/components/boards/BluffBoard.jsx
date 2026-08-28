@@ -123,7 +123,7 @@ export default function BluffBoard() {
   const isMyTurn = gameState.turn === playerIndex;
   const isFinished = gameState.status === 'finished';
   const isChallengePhase = gameState.status === 'challengeWindow';
-  const myHand = gameState.myHand || gameState.hands?.[playerIndex] || [];
+  const myHand = gameState.myHand || [];
   
   const rawOpponentIdx = room.players.findIndex((_, idx) => idx !== playerIndex);
   const opponentIndex = rawOpponentIdx !== -1 ? rawOpponentIdx : (playerIndex === 0 ? 1 : 0);
