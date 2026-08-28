@@ -281,7 +281,9 @@ export default function BluffBoard() {
         <div className="flex flex-wrap gap-2.5 justify-center sm:justify-start min-h-[120px] p-2 bg-gray-50 rounded-2xl border-[2px] border-[#1E1E24]">
           {myHand.length === 0 ? (
             <div className="w-full text-center py-6 font-extrabold text-[#06D6A0] text-lg">
-              🎉 Empty Hand! Victory Achieved!
+              {isFinished && gameState.winner === playerIndex
+                ? '🎉 Empty Hand! Victory Achieved!'
+                : '⏳ Loading hand cards...'}
             </div>
           ) : (
             myHand.map((card) => {

@@ -126,15 +126,14 @@ export class RoomManager {
     }
   }
 
-  getSanitizedRoomState(room, socketId) {
+  getSanitizedRoomForPlayerIndex(room, targetPlayerIndex) {
     if (!room || !room.gameState) return room;
     if (room.gameType !== 'bluff') return room;
 
-    const playerIndex = room.players.findIndex(p => p.socketId === socketId);
     const gs = room.gameState;
 
     const sanitizedHands = (gs.hands || []).map((hand, idx) => {
-      if (idx === playerIndex) return hand;
+      if (idx === targetPlayerIndex) return hand;
       return [];
     });
 
@@ -164,20 +163,26 @@ export class RoomManager {
     };
   }
 
+  getSanitizedRoomState(room, socketId) {
+    if (!room || !room.gameState) return room;
+    const playerIndex = room.players.findIndex(p => p.socketId === socketId || p.id === socketId);
+    return this.getSanitizedRoomForPlayerIndex(room, playerIndex);
+  }
+
   broadcastRoomUpdated(roomId) {
     const room = this.rooms.get(roomId);
     if (!room || !this.io) return;
 
-    room.players.forEach(p => {
+    room.players.forEach((p, idx) => {
       if (p.socketId) {
-        const sanitizedRoom = this.getSanitizedRoomState(room, p.socketId);
+        const sanitizedRoom = this.getSanitizedRoomForPlayerIndex(room, idx);
         this.io.to(p.socketId).emit('room_updated', sanitizedRoom);
       }
     });
 
     (room.spectators || []).forEach(s => {
       if (s.socketId) {
-        const sanitizedRoom = this.getSanitizedRoomState(room, s.socketId);
+        const sanitizedRoom = this.getSanitizedRoomForPlayerIndex(room, -1);
         this.io.to(s.socketId).emit('room_updated', sanitizedRoom);
       }
     });
