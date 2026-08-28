@@ -63,7 +63,9 @@ export function startBluffDeal(state, numPlayers) {
   state.pile = [];
   state.lastPlay = null;
   state.lastChallengeResult = null;
+  state.challengeDeadline = null;
   state.winner = null;
+  state.isDraw = false;
 }
 
 export function handleBluffMove(state, playerIndex, move) {
@@ -71,14 +73,9 @@ export function handleBluffMove(state, playerIndex, move) {
     return { valid: false, reason: 'Invalid move payload' };
   }
 
-  const playerCount = state.hands ? state.hands.length : 2;
+  const playerCount = state.hands && state.hands.length > 0 ? state.hands.length : 2;
 
   if (move.type === 'start_game') {
-    if (state.status !== 'waiting') {
-      // If already playing, re-deal clean state
-      startBluffDeal(state, move.numPlayers || playerCount || 2);
-      return { valid: true, state };
-    }
     if (!Array.isArray(state.readyPlayers)) {
       state.readyPlayers = [];
     }
@@ -86,7 +83,7 @@ export function handleBluffMove(state, playerIndex, move) {
       state.readyPlayers.push(playerIndex);
     }
     const totalPlayers = Math.max(2, move.numPlayers || 2);
-    if (state.readyPlayers.length >= totalPlayers) {
+    if (state.readyPlayers.length >= totalPlayers || state.status !== 'waiting') {
       startBluffDeal(state, totalPlayers);
     }
     return { valid: true, state };
@@ -186,8 +183,8 @@ export function handleBluffMove(state, playerIndex, move) {
       revealedCards: lastPlay.cards
     };
 
-    // Win condition check
-    if (wasTruthful && state.hands[lastPlay.playerIndex].length === 0) {
+    // Win condition check: ONLY if hand is legitimately 0 after playing truthful cards
+    if (wasTruthful && Array.isArray(state.hands[lastPlay.playerIndex]) && state.hands[lastPlay.playerIndex].length === 0) {
       state.winner = lastPlay.playerIndex;
       state.status = 'finished';
       state.challengeDeadline = null;
@@ -212,8 +209,8 @@ export function handleBluffMove(state, playerIndex, move) {
 
     const lastPlay = state.lastPlay;
 
-    // If acting player emptied hand and was NOT challenged, they win!
-    if (lastPlay && state.hands[lastPlay.playerIndex].length === 0) {
+    // Win condition check: ONLY if lastPlay exists and acting player legitimately emptied hand
+    if (lastPlay && Array.isArray(state.hands[lastPlay.playerIndex]) && state.hands[lastPlay.playerIndex].length === 0) {
       state.winner = lastPlay.playerIndex;
       state.status = 'finished';
       state.challengeDeadline = null;
