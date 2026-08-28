@@ -61,18 +61,29 @@ export class RoomManager {
       return { success: false, error: 'Room not found. Check your 6-digit code.' };
     }
 
-    const existingPlayerIndex = room.players.findIndex(p => p.id === user.id || p.socketId === socketId);
-    if (existingPlayerIndex !== -1) {
-      room.players[existingPlayerIndex].socketId = socketId;
-      room.players[existingPlayerIndex].picture = user.picture || room.players[existingPlayerIndex].picture;
-      return { success: true, room, playerIndex: existingPlayerIndex };
+    const existingBySocket = room.players.findIndex(p => p.socketId === socketId);
+    if (existingBySocket !== -1) {
+      room.players[existingBySocket].picture = user.picture || room.players[existingBySocket].picture;
+      return { success: true, room, playerIndex: existingBySocket };
     }
 
-    if (room.players.length < 2) {
+    const existingById = room.players.findIndex(p => p.id === user.id);
+    if (existingById !== -1 && room.players[existingById].disconnected) {
+      room.players[existingById].socketId = socketId;
+      room.players[existingById].disconnected = false;
+      return { success: true, room, playerIndex: existingById };
+    }
+
+    const maxPlayers = room.gameType === 'bluff' ? 4 : 2;
+    if (room.players.length < maxPlayers) {
+      const playerNum = room.players.length + 1;
+      const effectiveName = room.players.some(p => p.name === user.name) ? `${user.name} (${playerNum})` : user.name;
+      const effectiveId = user.id + '_' + socketId.substring(0, 4);
+
       room.players.push({
         socketId,
-        id: user.id,
-        name: user.name,
+        id: effectiveId,
+        name: effectiveName,
         avatar: user.avatar,
         picture: user.picture || null,
         isReady: true,
@@ -82,13 +93,13 @@ export class RoomManager {
 
       // Initialize accumulatedScores
       if (!room.accumulatedScores) room.accumulatedScores = {};
-      room.accumulatedScores[user.id] = 0;
+      room.accumulatedScores[effectiveId] = 0;
       if (room.players[0]) {
         room.accumulatedScores[room.players[0].id] = room.accumulatedScores[room.players[0].id] || 0;
       }
       room.accumulatedScores.draws = room.accumulatedScores.draws || 0;
 
-      if (room.players.length === 2) {
+      if (room.gameType !== 'bluff' && room.players.length === 2) {
         room.gameState.status = 'playing';
       }
 
@@ -131,6 +142,7 @@ export class RoomManager {
     if (room.gameType !== 'bluff') return room;
 
     const gs = room.gameState;
+    const myHand = (gs.hands && targetPlayerIndex >= 0) ? (gs.hands[targetPlayerIndex] || []) : [];
 
     const sanitizedHands = (gs.hands || []).map((hand, idx) => {
       if (idx === targetPlayerIndex) return hand;
@@ -156,6 +168,7 @@ export class RoomManager {
       ...room,
       gameState: {
         ...gs,
+        myHand,
         hands: sanitizedHands,
         pile: sanitizedPile,
         lastPlay: sanitizedLastPlay

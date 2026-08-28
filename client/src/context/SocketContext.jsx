@@ -54,6 +54,12 @@ export function SocketProvider({ children }) {
 
     newSocket.on('room_updated', (updatedRoom) => {
       setRoom({ ...updatedRoom });
+      if (updatedRoom?.players) {
+        const myIdx = updatedRoom.players.findIndex(p => p.socketId === newSocket.id);
+        if (myIdx !== -1) {
+          setPlayerIndex(myIdx);
+        }
+      }
       audio.playMove();
     });
 
@@ -62,8 +68,8 @@ export function SocketProvider({ children }) {
       setSearchingGameType(null);
       setRoom(matchedRoom);
       
-      const idx = matchedRoom.players.findIndex(p => p.id === user.id);
-      setPlayerIndex(idx !== -1 ? idx : 0);
+      const idx = matchedRoom?.players?.findIndex(p => p.socketId === newSocket.id);
+      setPlayerIndex(idx !== -1 && idx !== undefined ? idx : 0);
       audio.playWin();
     });
 
