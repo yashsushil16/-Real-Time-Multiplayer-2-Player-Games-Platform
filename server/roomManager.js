@@ -9,6 +9,123 @@ export class RoomManager {
     this.challengeTimers = new Map();
   }
 
+  generateRoomCode() {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    let code = '';
+    for (let i = 0; i < 6; i++) {
+      code += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return code;
+  }
+
+  createRoom({ socketId, user, gameType }) {
+    let roomId = this.generateRoomCode();
+    while (this.rooms.has(roomId)) {
+      roomId = this.generateRoomCode();
+    }
+
+    const initialGameState = createInitialGameState(gameType);
+
+    const room = {
+      id: roomId,
+      gameType,
+      gameName: initialGameState.gameName,
+      players: [
+        {
+          socketId,
+          id: user.id,
+          name: user.name,
+          avatar: user.avatar,
+          picture: user.picture || null,
+          isReady: false,
+          voiceEnabled: false
+        }
+      ],
+      spectators: [],
+      gameState: initialGameState,
+      chat: [],
+      rematchVotes: [],
+      createdAt: Date.now(),
+      accumulatedScores: {}
+    };
+
+    this.rooms.set(roomId, room);
+    return room;
+  }
+
+  joinRoom({ roomId, socketId, user }) {
+    const cleanRoomId = (roomId || '').trim().toUpperCase();
+    const room = this.rooms.get(cleanRoomId);
+
+    if (!room) {
+      return { success: false, error: 'Room not found. Check your 6-digit code.' };
+    }
+
+    const existingPlayerIndex = room.players.findIndex(p => p.id === user.id || p.socketId === socketId);
+    if (existingPlayerIndex !== -1) {
+      room.players[existingPlayerIndex].socketId = socketId;
+      room.players[existingPlayerIndex].picture = user.picture || room.players[existingPlayerIndex].picture;
+      return { success: true, room, playerIndex: existingPlayerIndex };
+    }
+
+    if (room.players.length < 2) {
+      room.players.push({
+        socketId,
+        id: user.id,
+        name: user.name,
+        avatar: user.avatar,
+        picture: user.picture || null,
+        isReady: true,
+        voiceEnabled: false
+      });
+      const playerIndex = room.players.length - 1;
+
+      // Initialize accumulatedScores
+      if (!room.accumulatedScores) room.accumulatedScores = {};
+      room.accumulatedScores[user.id] = 0;
+      if (room.players[0]) {
+        room.accumulatedScores[room.players[0].id] = room.accumulatedScores[room.players[0].id] || 0;
+      }
+      room.accumulatedScores.draws = room.accumulatedScores.draws || 0;
+
+      if (room.players.length === 2) {
+        room.gameState.status = 'playing';
+      }
+
+      return { success: true, room, playerIndex };
+    } else {
+      room.spectators.push({ socketId, name: user.name });
+      return { success: true, room, isSpectator: true };
+    }
+  }
+
+  findQuickMatch({ socketId, user, gameType }) {
+    if (!this.quickMatchQueues.has(gameType)) {
+      this.quickMatchQueues.set(gameType, []);
+    }
+
+    const queue = this.quickMatchQueues.get(gameType);
+    const filteredQueue = queue.filter(item => item.socketId !== socketId && item.user.id !== user.id);
+    this.quickMatchQueues.set(gameType, filteredQueue);
+
+    if (filteredQueue.length > 0) {
+      const opponent = filteredQueue.shift();
+      const room = this.createRoom({ socketId: opponent.socketId, user: opponent.user, gameType });
+      this.joinRoom({ roomId: room.id, socketId, user });
+
+      return { matched: true, room, opponentSocketId: opponent.socketId };
+    } else {
+      filteredQueue.push({ socketId, user });
+      return { matched: false, inQueue: true };
+    }
+  }
+
+  removeFromQueue(socketId) {
+    for (const [gameType, queue] of this.quickMatchQueues.entries()) {
+      this.quickMatchQueues.set(gameType, queue.filter(item => item.socketId !== socketId));
+    }
+  }
+
   getSanitizedRoomState(room, socketId) {
     if (!room || !room.gameState) return room;
     if (room.gameType !== 'bluff') return room;
@@ -206,6 +323,8 @@ export class RoomManager {
     const playerIndex = room.players.findIndex(p => p.socketId === socketId);
     if (playerIndex === -1) return { success: false, error: 'Only players can switch games' };
 
+    this.clearChallengeTimer(roomId);
+
     const initialGameState = createInitialGameState(gameType);
     room.gameType = gameType;
     room.gameName = initialGameState.gameName;
@@ -251,6 +370,7 @@ export class RoomManager {
     for (const [roomId, room] of this.rooms.entries()) {
       const playerIndex = room.players.findIndex(p => p.socketId === socketId);
       if (playerIndex !== -1) {
+        this.clearChallengeTimer(roomId);
         room.players[playerIndex].disconnected = true;
         room.players[playerIndex].voiceEnabled = false; // Reset voice state on disconnect
         room.rematchVotes = []; // Clear rematch votes on player disconnect
@@ -258,6 +378,7 @@ export class RoomManager {
         setTimeout(() => {
           const currentRoom = this.rooms.get(roomId);
           if (currentRoom && currentRoom.players.every(p => p.disconnected)) {
+            this.clearChallengeTimer(roomId);
             this.rooms.delete(roomId);
           }
         }, 60000);
