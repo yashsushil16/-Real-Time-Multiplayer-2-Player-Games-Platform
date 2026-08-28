@@ -99,11 +99,8 @@ export class RoomManager {
       }
       room.accumulatedScores.draws = room.accumulatedScores.draws || 0;
 
-      if (room.players.length === 2) {
+      if (room.gameType !== 'bluff' && room.players.length === 2) {
         room.gameState.status = 'playing';
-        if (room.gameType === 'bluff') {
-          room.gameState = createInitialGameState('bluff');
-        }
       }
 
       return { success: true, room, playerIndex };
@@ -357,7 +354,7 @@ export class RoomManager {
     room.gameName = initialGameState.gameName;
     room.gameState = initialGameState;
 
-    if (room.players.length === 2) {
+    if (room.gameType !== 'bluff' && room.players.length === 2) {
       room.gameState.status = 'playing';
     }
 
