@@ -2,6 +2,26 @@ const RANKS = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K']
 const SUITS = ['hearts', 'diamonds', 'clubs', 'spades'];
 
 export function createBluffState(playerCount = 2) {
+  return {
+    gameType: 'bluff',
+    gameName: 'Bluff (Cheat)',
+    status: 'waiting', // Starts in 'waiting' lobby phase until players click Start Game
+    turn: 0,
+    requiredRank: 'A',
+    ranksCycle: RANKS,
+    readyPlayers: [], // Player indices who clicked Start Game / Ready
+    hands: [], // Server-authoritative hands: hands[playerIndex]
+    handCounts: [],
+    pile: [], // Array of { playerIndex, claimedRank, cards, cardCount }
+    lastPlay: null, // { playerIndex, claimedRank, cardCount, cards }
+    lastChallengeResult: null, // { challengerIndex, challengedIndex, wasTruthful, loserIndex, revealedCards }
+    challengeDeadline: null,
+    winner: null,
+    isDraw: false
+  };
+}
+
+export function startBluffDeal(state, numPlayers) {
   const deck = [];
   for (const suit of SUITS) {
     for (const rank of RANKS) {
@@ -15,15 +35,15 @@ export function createBluffState(playerCount = 2) {
     [deck[i], deck[j]] = [deck[j], deck[i]];
   }
 
-  const numPlayers = Math.max(2, Math.min(4, playerCount));
-  const hands = Array.from({ length: numPlayers }, () => []);
+  const actualPlayers = Math.max(2, Math.min(4, numPlayers));
+  const hands = Array.from({ length: actualPlayers }, () => []);
   const removedFromPlay = [];
 
-  const cardsPerPlayer = Math.floor(deck.length / numPlayers);
-  const totalDealt = cardsPerPlayer * numPlayers;
+  const cardsPerPlayer = Math.floor(deck.length / actualPlayers);
+  const totalDealt = cardsPerPlayer * actualPlayers;
 
   for (let i = 0; i < totalDealt; i++) {
-    hands[i % numPlayers].push(deck[i]);
+    hands[i % actualPlayers].push(deck[i]);
   }
   for (let i = totalDealt; i < deck.length; i++) {
     removedFromPlay.push(deck[i]);
@@ -34,22 +54,15 @@ export function createBluffState(playerCount = 2) {
     hand.sort((a, b) => RANKS.indexOf(a.rank) - RANKS.indexOf(b.rank));
   });
 
-  return {
-    gameType: 'bluff',
-    gameName: 'Bluff (Cheat)',
-    status: 'playing', // 'playing' | 'challengeWindow' | 'finished'
-    turn: 0,
-    requiredRank: 'A',
-    ranksCycle: RANKS,
-    hands, // Server-authoritative hands: hands[playerIndex]
-    handCounts: hands.map(h => h.length),
-    pile: [], // Array of { playerIndex, claimedRank, cards, cardCount }
-    lastPlay: null, // { playerIndex, claimedRank, cardCount, cards }
-    lastChallengeResult: null, // { challengerIndex, challengedIndex, wasTruthful, loserIndex, revealedCards }
-    challengeDeadline: null,
-    winner: null,
-    isDraw: false
-  };
+  state.hands = hands;
+  state.handCounts = hands.map(h => h.length);
+  state.status = 'playing';
+  state.turn = 0;
+  state.requiredRank = 'A';
+  state.pile = [];
+  state.lastPlay = null;
+  state.lastChallengeResult = null;
+  state.winner = null;
 }
 
 export function handleBluffMove(state, playerIndex, move) {
@@ -58,6 +71,23 @@ export function handleBluffMove(state, playerIndex, move) {
   }
 
   const playerCount = state.hands ? state.hands.length : 2;
+
+  if (move.type === 'start_game') {
+    if (state.status !== 'waiting') {
+      return { valid: false, reason: 'Game already started' };
+    }
+    if (!Array.isArray(state.readyPlayers)) {
+      state.readyPlayers = [];
+    }
+    if (!state.readyPlayers.includes(playerIndex)) {
+      state.readyPlayers.push(playerIndex);
+    }
+    const totalPlayers = Math.max(2, move.numPlayers || 2);
+    if (state.readyPlayers.length >= totalPlayers) {
+      startBluffDeal(state, totalPlayers);
+    }
+    return { valid: true, state };
+  }
 
   if (move.type === 'play_cards') {
     if (state.status !== 'playing') {

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useSocket } from '../../context/SocketContext';
-import { ShieldAlert, CheckCircle2, Flame, Award, AlertTriangle } from 'lucide-react';
+import { ShieldAlert, CheckCircle2, Flame } from 'lucide-react';
 
 const SUIT_SYMBOLS = {
   hearts: { symbol: '♥', color: 'text-[#FF5A5F]' },
@@ -33,6 +33,92 @@ export default function BluffBoard() {
   }, [gameState?.turn, gameState?.status]);
 
   if (!gameState) return null;
+
+  // Pre-Game Lobby State (Waiting for players to click Start Game)
+  if (gameState.status === 'waiting') {
+    const readyPlayers = gameState.readyPlayers || [];
+    const isIReady = readyPlayers.includes(playerIndex);
+    const readyCount = readyPlayers.length;
+
+    const handleStartClick = () => {
+      makeMove({
+        type: 'start_game',
+        numPlayers: room.players.length
+      });
+    };
+
+    return (
+      <div className="flex flex-col items-center w-full max-w-2xl mx-auto space-y-6 py-6 select-none animate-pop">
+        <div className="w-full card-geo bg-[#FFD166] p-6 text-center space-y-3">
+          <div className="w-16 h-16 mx-auto rounded-2xl bg-white border-[3px] border-[#1E1E24] shadow-[4px_4px_0px_#1E1E24] flex items-center justify-center text-4xl animate-bounce">
+            🃏
+          </div>
+          <h2 className="text-3xl font-black text-[#1E1E24] font-['Fredoka']">Bluff Game Lobby</h2>
+          <p className="text-sm font-bold text-[#1E1E24]/80">
+            Wait for players to join, then click <span className="underline">Start Game</span> when ready to deal cards!
+          </p>
+        </div>
+
+        {/* Players Readiness List */}
+        <div className="w-full card-geo bg-white p-5 border-[3px] border-[#1E1E24] space-y-4">
+          <h3 className="font-extrabold text-[#1E1E24] text-lg flex items-center justify-between">
+            <span>Joined Players ({room.players.length} / 4)</span>
+            <span className="text-xs font-bold text-[#5C5C66]">
+              {readyCount} of {room.players.length} Ready
+            </span>
+          </h3>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {room.players.map((p, idx) => {
+              const ready = readyPlayers.includes(idx);
+              return (
+                <div
+                  key={p.id || idx}
+                  className={`p-3.5 rounded-2xl border-[2.5px] border-[#1E1E24] flex items-center justify-between font-['Fredoka'] transition-all ${
+                    ready ? 'bg-[#06D6A0]/20' : 'bg-gray-50'
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <span className="text-2xl">{p.avatar || '👤'}</span>
+                    <div>
+                      <div className="font-bold text-sm text-[#1E1E24] flex items-center gap-1">
+                        <span>{p.name}</span>
+                        {idx === playerIndex && <span className="text-xs text-gray-500">(You)</span>}
+                      </div>
+                    </div>
+                  </div>
+
+                  <span className={`badge-geo text-xs ${ready ? 'badge-teal' : 'badge-yellow'}`}>
+                    {ready ? 'READY 🟢' : 'NOT READY ⏳'}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Start Game Action Button */}
+        <div className="w-full text-center space-y-3">
+          {room.players.length < 2 ? (
+            <div className="card-geo bg-gray-100 p-4 font-bold text-sm text-[#5C5C66]">
+              ⏳ Share room code <span className="font-mono text-base bg-[#FFD166] px-2 py-0.5 rounded border border-[#1E1E24]">{room.id}</span> with at least 1 more player to begin!
+            </div>
+          ) : isIReady ? (
+            <div className="btn-geo bg-[#06D6A0] text-[#1E1E24] text-lg py-4 w-full flex items-center justify-center gap-2 cursor-default border-[3px] border-[#1E1E24]">
+              <span>✓ You are Ready! (Waiting for all players to click Start...)</span>
+            </div>
+          ) : (
+            <button
+              onClick={handleStartClick}
+              className="btn-geo btn-geo-primary text-xl py-4 w-full flex items-center justify-center gap-2 animate-pulse-slow"
+            >
+              <span>🚀 START GAME / READY</span>
+            </button>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   const isMyTurn = gameState.turn === playerIndex;
   const isFinished = gameState.status === 'finished';
@@ -269,7 +355,7 @@ export default function BluffBoard() {
               className={`btn-geo text-sm py-2 px-5 ${
                 selectedCardIds.length > 0
                   ? 'btn-geo-primary'
-                  : 'bg-gray-200 border-[#1E1E24] cursor-not-allowed opacity-60'
+                  : 'bg-[#FFD166] text-[#1E1E24] border-[#1E1E24] opacity-50 cursor-not-allowed'
               }`}
             >
               Play {selectedCardIds.length} Card{selectedCardIds.length !== 1 ? 's' : ''} (Claim {gameState.requiredRank}s)
