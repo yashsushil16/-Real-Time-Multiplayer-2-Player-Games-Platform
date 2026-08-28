@@ -367,10 +367,20 @@ export default function BluffBoard() {
         {/* Hand Cards Grid */}
         <div className="flex flex-wrap gap-2.5 justify-center sm:justify-start min-h-[120px] p-2 bg-gray-50 rounded-2xl border-[2px] border-[#1E1E24]">
           {myHand.length === 0 ? (
-            <div className="w-full text-center py-6 font-extrabold text-[#06D6A0] text-lg">
-              {isFinished && gameState.winner === playerIndex
-                ? '🎉 Empty Hand! Victory Achieved!'
-                : '⏳ Loading hand cards...'}
+            <div className="w-full text-center py-6 font-extrabold text-[#06D6A0] text-lg space-y-3">
+              {isFinished && gameState.winner === playerIndex ? (
+                <div>🎉 Empty Hand! Victory Achieved!</div>
+              ) : (
+                <div className="space-y-2">
+                  <div className="text-[#1E1E24] text-base">⏳ Cards not dealt yet or loading...</div>
+                  <button
+                    onClick={() => makeMove({ type: 'start_game', numPlayers: room.players.length })}
+                    className="btn-geo btn-geo-primary text-sm py-2 px-5"
+                  >
+                    🚀 Click to Deal Cards
+                  </button>
+                </div>
+              )}
             </div>
           ) : (
             myHand.map((card) => {
