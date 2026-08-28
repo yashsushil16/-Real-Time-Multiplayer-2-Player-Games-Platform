@@ -3,6 +3,7 @@ import { createTicTacToeState, handleTicTacToeMove } from './ticTacToe.js';
 import { createConnectFourState, handleConnectFourMove } from './connectFour.js';
 import { createDotsAndBoxesState, handleDotsAndBoxesMove } from './dotsAndBoxes.js';
 import { createCheckersState, handleCheckersMove } from './checkers.js';
+import { createBluffState, handleBluffMove } from './bluff.js';
 
 export function createInitialGameState(gameType) {
   switch (gameType) {
@@ -16,6 +17,8 @@ export function createInitialGameState(gameType) {
       return createDotsAndBoxesState();
     case 'checkers':
       return createCheckersState();
+    case 'bluff':
+      return createBluffState();
     default:
       return createTicTacToeState();
   }
@@ -33,6 +36,8 @@ export function processGameMove(state, playerIndex, move) {
       return handleDotsAndBoxesMove(state, playerIndex, move);
     case 'checkers':
       return handleCheckersMove(state, playerIndex, move);
+    case 'bluff':
+      return handleBluffMove(state, playerIndex, move);
     default:
       return { valid: false, reason: 'Unsupported game type' };
   }

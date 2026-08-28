@@ -6,135 +6,102 @@ export class RoomManager {
     this.io = io;
     this.rooms = new Map();
     this.quickMatchQueues = new Map();
+    this.challengeTimers = new Map();
   }
 
-  generateRoomCode() {
-    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-    let code = '';
-    for (let i = 0; i < 6; i++) {
-      code += chars.charAt(Math.floor(Math.random() * chars.length));
+  getSanitizedRoomState(room, socketId) {
+    if (!room || !room.gameState) return room;
+    if (room.gameType !== 'bluff') return room;
+
+    const playerIndex = room.players.findIndex(p => p.socketId === socketId);
+    const gs = room.gameState;
+
+    const sanitizedHands = (gs.hands || []).map((hand, idx) => {
+      if (idx === playerIndex) return hand;
+      return [];
+    });
+
+    const sanitizedPile = (gs.pile || []).map(entry => ({
+      playerIndex: entry.playerIndex,
+      claimedRank: entry.claimedRank,
+      cardCount: entry.cardCount
+    }));
+
+    let sanitizedLastPlay = null;
+    if (gs.lastPlay) {
+      sanitizedLastPlay = {
+        playerIndex: gs.lastPlay.playerIndex,
+        claimedRank: gs.lastPlay.claimedRank,
+        cardCount: gs.lastPlay.cardCount
+      };
     }
-    return code;
-  }
 
-  createRoom({ socketId, user, gameType }) {
-    let roomId = this.generateRoomCode();
-    while (this.rooms.has(roomId)) {
-      roomId = this.generateRoomCode();
-    }
-
-    const initialGameState = createInitialGameState(gameType);
-
-    const room = {
-      id: roomId,
-      gameType,
-      gameName: initialGameState.gameName,
-      players: [
-        {
-          socketId,
-          id: user.id,
-          name: user.name,
-          avatar: user.avatar,
-          picture: user.picture || null,
-          isReady: false,
-          voiceEnabled: false
-        }
-      ],
-      spectators: [],
-      gameState: initialGameState,
-      chat: [],
-      rematchVotes: [],
-      createdAt: Date.now(),
-      accumulatedScores: {}
+    return {
+      ...room,
+      gameState: {
+        ...gs,
+        hands: sanitizedHands,
+        pile: sanitizedPile,
+        lastPlay: sanitizedLastPlay
+      }
     };
-
-    this.rooms.set(roomId, room);
-    return room;
   }
 
-  joinRoom({ roomId, socketId, user }) {
-    const cleanRoomId = (roomId || '').trim().toUpperCase();
-    const room = this.rooms.get(cleanRoomId);
+  broadcastRoomUpdated(roomId) {
+    const room = this.rooms.get(roomId);
+    if (!room || !this.io) return;
 
-    if (!room) {
-      return { success: false, error: 'Room not found. Check your 6-digit code.' };
-    }
-
-    const existingPlayerIndex = room.players.findIndex(p => p.id === user.id || p.socketId === socketId);
-    if (existingPlayerIndex !== -1) {
-      room.players[existingPlayerIndex].socketId = socketId;
-      room.players[existingPlayerIndex].picture = user.picture || room.players[existingPlayerIndex].picture;
-      return { success: true, room, playerIndex: existingPlayerIndex };
-    }
-
-    if (room.players.length < 2) {
-      room.players.push({
-        socketId,
-        id: user.id,
-        name: user.name,
-        avatar: user.avatar,
-        picture: user.picture || null,
-        isReady: true,
-        voiceEnabled: false
-      });
-      const playerIndex = room.players.length - 1;
-
-      // Initialize accumulatedScores
-      if (!room.accumulatedScores) room.accumulatedScores = {};
-      room.accumulatedScores[user.id] = 0;
-      if (room.players[0]) {
-        room.accumulatedScores[room.players[0].id] = room.accumulatedScores[room.players[0].id] || 0;
+    room.players.forEach(p => {
+      if (p.socketId) {
+        const sanitizedRoom = this.getSanitizedRoomState(room, p.socketId);
+        this.io.to(p.socketId).emit('room_updated', sanitizedRoom);
       }
-      room.accumulatedScores.draws = room.accumulatedScores.draws || 0;
+    });
 
-      if (room.players.length === 2) {
-        room.gameState.status = 'playing';
+    (room.spectators || []).forEach(s => {
+      if (s.socketId) {
+        const sanitizedRoom = this.getSanitizedRoomState(room, s.socketId);
+        this.io.to(s.socketId).emit('room_updated', sanitizedRoom);
       }
+    });
+  }
 
-      return { success: true, room, playerIndex };
-    } else {
-      room.spectators.push({ socketId, name: user.name });
-      return { success: true, room, isSpectator: true };
+  clearChallengeTimer(roomId) {
+    if (this.challengeTimers.has(roomId)) {
+      clearTimeout(this.challengeTimers.get(roomId));
+      this.challengeTimers.delete(roomId);
     }
   }
 
-  findQuickMatch({ socketId, user, gameType }) {
-    if (!this.quickMatchQueues.has(gameType)) {
-      this.quickMatchQueues.set(gameType, []);
-    }
-
-    const queue = this.quickMatchQueues.get(gameType);
-    const filteredQueue = queue.filter(item => item.socketId !== socketId && item.user.id !== user.id);
-    this.quickMatchQueues.set(gameType, filteredQueue);
-
-    if (filteredQueue.length > 0) {
-      const opponent = filteredQueue.shift();
-      const room = this.createRoom({ socketId: opponent.socketId, user: opponent.user, gameType });
-      this.joinRoom({ roomId: room.id, socketId, user });
-
-      return { matched: true, room, opponentSocketId: opponent.socketId };
-    } else {
-      filteredQueue.push({ socketId, user });
-      return { matched: false, inQueue: true };
-    }
-  }
-
-  removeFromQueue(socketId) {
-    for (const [gameType, queue] of this.quickMatchQueues.entries()) {
-      this.quickMatchQueues.set(gameType, queue.filter(item => item.socketId !== socketId));
-    }
-  }
-
-  async handleMove({ roomId, socketId, move }) {
+  async handleMove({ roomId, socketId, move, isSystemAction = false }) {
     const room = this.rooms.get(roomId);
     if (!room) return { error: 'Room not found' };
 
-    const playerIndex = room.players.findIndex(p => p.socketId === socketId);
-    if (playerIndex === -1) return { error: 'You are not a player in this room' };
+    let playerIndex = -1;
+    if (isSystemAction) {
+      playerIndex = room.gameState.turn;
+    } else {
+      playerIndex = room.players.findIndex(p => p.socketId === socketId);
+      if (playerIndex === -1) return { error: 'You are not a player in this room' };
+    }
+
+    this.clearChallengeTimer(roomId);
 
     const result = processGameMove(room.gameState, playerIndex, move);
     if (!result.valid) {
       return { error: result.reason };
+    }
+
+    // Schedule challenge window timeout for Bluff if entering challengeWindow phase
+    if (room.gameState.status === 'challengeWindow') {
+      const timer = setTimeout(async () => {
+        const currentRoom = this.rooms.get(roomId);
+        if (currentRoom && currentRoom.gameState && currentRoom.gameState.status === 'challengeWindow') {
+          await this.handleMove({ roomId, socketId: null, move: { type: 'challenge_timeout' }, isSystemAction: true });
+          this.broadcastRoomUpdated(roomId);
+        }
+      }, 6500);
+      this.challengeTimers.set(roomId, timer);
     }
 
     if (room.gameState.status === 'finished') {

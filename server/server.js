@@ -176,9 +176,9 @@ io.on('connection', (socket) => {
 
       socket.join(result.room.id);
       
-      io.to(result.room.id).emit('room_updated', result.room);
+      roomManager.broadcastRoomUpdated(result.room.id);
 
-      if (callback) callback({ success: true, room: result.room, playerIndex: result.playerIndex });
+      if (callback) callback({ success: true, room: roomManager.getSanitizedRoomState(result.room, socket.id), playerIndex: result.playerIndex });
     } catch (err) {
       if (callback) callback({ success: false, error: err.message });
     }
@@ -194,8 +194,9 @@ io.on('connection', (socket) => {
         const opponentSocket = io.sockets.sockets.get(matchResult.opponentSocketId);
         if (opponentSocket) opponentSocket.join(matchResult.room.id);
 
-        io.to(matchResult.room.id).emit('match_found', { room: matchResult.room });
-        if (callback) callback({ success: true, matched: true, room: matchResult.room });
+        roomManager.broadcastRoomUpdated(matchResult.room.id);
+        io.to(matchResult.room.id).emit('match_found', { room: roomManager.getSanitizedRoomState(matchResult.room, socket.id) });
+        if (callback) callback({ success: true, matched: true, room: roomManager.getSanitizedRoomState(matchResult.room, socket.id) });
       } else {
         if (callback) callback({ success: true, matched: false, inQueue: true });
       }
@@ -217,14 +218,14 @@ io.on('connection', (socket) => {
       return;
     }
 
-    io.to(roomId).emit('room_updated', result.room);
+    roomManager.broadcastRoomUpdated(roomId);
   });
 
   // Switch Active Game in Room
   socket.on('switch_game', ({ roomId, gameType }, callback) => {
     const result = roomManager.switchGame({ roomId, gameType, socketId: socket.id });
     if (result.success) {
-      io.to(roomId).emit('room_updated', result.room);
+      roomManager.broadcastRoomUpdated(roomId);
       if (callback) callback({ success: true });
     } else {
       if (callback) callback({ success: false, error: result.error });
@@ -235,7 +236,7 @@ io.on('connection', (socket) => {
   socket.on('send_chat', ({ roomId, message, type }) => {
     const result = roomManager.handleChat({ roomId, socketId: socket.id, message, type });
     if (result) {
-      io.to(roomId).emit('chat_updated', { room: result.room, newMsg: result.chatMsg });
+      io.to(roomId).emit('chat_updated', { room: roomManager.getSanitizedRoomState(result.room, socket.id), newMsg: result.chatMsg });
     }
   });
 
@@ -244,7 +245,7 @@ io.on('connection', (socket) => {
     const result = roomManager.handleRematch({ roomId, socketId: socket.id });
     if (result) {
       io.to(roomId).emit('rematch_status', result);
-      io.to(roomId).emit('room_updated', result.room);
+      roomManager.broadcastRoomUpdated(roomId);
     }
   });
 
@@ -252,7 +253,7 @@ io.on('connection', (socket) => {
   socket.on('toggle_voice', ({ roomId, enabled }) => {
     const room = roomManager.toggleVoice({ roomId, socketId: socket.id, enabled });
     if (room) {
-      io.to(roomId).emit('room_updated', room);
+      roomManager.broadcastRoomUpdated(roomId);
     }
   });
 
@@ -266,7 +267,7 @@ io.on('connection', (socket) => {
     try {
       const room = roomManager.updatePlayerProfile(socket.id, user);
       if (room) {
-        io.to(room.id).emit('room_updated', room);
+        roomManager.broadcastRoomUpdated(room.id);
       }
     } catch (err) {
       console.error('Error updating profile in room:', err.message);
@@ -278,7 +279,7 @@ io.on('connection', (socket) => {
     socket.leave(roomId);
     const discResult = roomManager.handleDisconnect(socket.id);
     if (discResult) {
-      io.to(roomId).emit('room_updated', discResult.room);
+      roomManager.broadcastRoomUpdated(roomId);
     }
   });
 

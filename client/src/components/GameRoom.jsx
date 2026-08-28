@@ -7,6 +7,7 @@ import TicTacToeBoard from './boards/TicTacToeBoard';
 import ConnectFourBoard from './boards/ConnectFourBoard';
 import DotsAndBoxesBoard from './boards/DotsAndBoxesBoard';
 import CheckersBoard from './boards/CheckersBoard';
+import BluffBoard from './boards/BluffBoard';
 import { audio } from '../utils/audio';
 
 const GAMES_LIST = [
@@ -14,7 +15,8 @@ const GAMES_LIST = [
   { id: 'ticTacToe', title: 'Tic-Tac-Toe', icon: '❌' },
   { id: 'connectFour', title: 'Connect 4', icon: '🟡' },
   { id: 'dotsAndBoxes', title: 'Dots & Boxes', icon: '🔳' },
-  { id: 'checkers', title: 'Checkers', icon: '🔴' }
+  { id: 'checkers', title: 'Checkers', icon: '🔴' },
+  { id: 'bluff', title: 'Bluff (Cheat)', icon: '🃏' }
 ];
 
 export default function GameRoom() {
@@ -314,6 +316,8 @@ export default function GameRoom() {
         return <DotsAndBoxesBoard />;
       case 'checkers':
         return <CheckersBoard />;
+      case 'bluff':
+        return <BluffBoard />;
       default:
         return <TicTacToeBoard />;
     }

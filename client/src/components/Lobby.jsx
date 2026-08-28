@@ -47,6 +47,15 @@ const GAME_LINEUP = [
     tag: 'Mastery',
     badgeColor: 'badge-purple',
     desc: '8x8 board, diagonal jumps, piece captures, and kinging!'
+  },
+  {
+    id: 'bluff',
+    title: 'Bluff (Cheat)',
+    icon: '🃏',
+    color: 'bg-[#FF5A5F]',
+    tag: 'Deception',
+    badgeColor: 'badge-coral',
+    desc: 'Declare required ranks, play face-down lies, and call Bluff!'
   }
 ];
 
@@ -91,7 +100,7 @@ export default function Lobby() {
             Play Friends or Random Opponents!
           </h1>
           <p className="text-base font-semibold text-[#1E1E24]/80">
-            Choose from 5 server-authoritative games. Share a 6-digit room code with a buddy or hit Quick Match to play instantly.
+            Choose from 6 server-authoritative games. Share a 6-digit room code with a buddy or hit Quick Match to play instantly.
           </p>
         </div>
 
