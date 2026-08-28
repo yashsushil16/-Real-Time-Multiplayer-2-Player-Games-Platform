@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
+    "build": "npm run build --prefix client",
     "start": "npm run start --prefix server",
     "server": "npm run dev --prefix server",
     "client": "npm run dev --prefix client",
