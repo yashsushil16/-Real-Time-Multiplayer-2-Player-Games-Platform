@@ -67,8 +67,8 @@ export class RoomManager {
       return { success: true, room, playerIndex: existingBySocket };
     }
 
-    const existingById = room.players.findIndex(p => p.id === user.id);
-    if (existingById !== -1 && room.players[existingById].disconnected) {
+    const existingById = room.players.findIndex(p => p.id === user.id || p.id.startsWith(user.id));
+    if (existingById !== -1) {
       room.players[existingById].socketId = socketId;
       room.players[existingById].disconnected = false;
       return { success: true, room, playerIndex: existingById };
@@ -181,7 +181,13 @@ export class RoomManager {
 
   getSanitizedRoomState(room, socketId) {
     if (!room || !room.gameState) return room;
-    const playerIndex = room.players.findIndex(p => p.socketId === socketId || p.id === socketId);
+    let playerIndex = room.players.findIndex(p => p.socketId === socketId);
+    if (playerIndex === -1 && typeof socketId === 'string') {
+      playerIndex = room.players.findIndex(p => p.id === socketId || p.id.startsWith(socketId));
+    }
+    if (playerIndex === -1 && room.players.length > 0) {
+      playerIndex = 0;
+    }
     return this.getSanitizedRoomForPlayerIndex(room, playerIndex);
   }
 
